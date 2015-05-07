@@ -13,7 +13,7 @@
 GenSens *mio;
 
 uint8_t node_id = 8;  //This node id
-uint8_t gw_id = 1;    //gateway Id
+uint8_t gw_id = 1;    //gatewayId
 uint8_t gateway = 300;//Gateway
 uint8_t t_wait = 1;   //Wait T_WAIT*8 [8 because you sleep 8s]
 uint8_t n_times = 0;  //Time to wait before send the packets 
@@ -22,7 +22,7 @@ uint8_t n_times = 0;  //Time to wait before send the packets
 //use tabs to add apikey.h file or uncomment this line
 //#define APIKEY "xxxxxxxxxxxxxxxxx" //emoncms Account--> "Write API Key"
 
-String pck = "45.4;34.2;45.4;34.4";//Packet to send
+String pck = "34.4;2.6;3;4";//Packet to send
 String msg = "";//Received packets
 
 void setup() {

@@ -18,7 +18,7 @@ uint8_t gateway = 300; //Gateway
 
 //#include "apikey.h" 
 //use tabs to add apikey.h file or uncomment this line
-//#define APIKEY "xxxxxxxxxxxxxxxxx" //emoncms Account--> "Write API Key"
+#define APIKEY "xxxxxxxxxxxxxxxxx" //emoncms Account--> "Write API Key"
 
 String pck = "";//Packet to send
 String msg = "";//Received packets
@@ -39,20 +39,22 @@ void loop(){
     mio->moteino_receive(msg);
     
     if(msg != ""){//Check if msg is empty
-      Serial.println(mio->moteino_id_receive());//Send Id to RPI
+      Serial.print(mio->moteino_id_receive());//Send Id to RPI
       String sensor_c = "";//
-      for(uint8_t i = 0; i < msg.length(); i++){
+      for(uint8_t i = 0; i <= msg.length(); i++){
         if((msg[i] != ';')){
-          #if defined(DEBUG)
-            Serial.print(msg[i]);
-          #endif
           sensor_c += msg[i];//Sensor packet
+          #if defined(DEBUG)
+            Serial.print(sensor_c);
+            Serial.print("-");
+          #endif
         }else{
-          Serial.print(sensor_c.c_str());//Send sensor_c to RPI just print (toFloat())
           Serial.print(F(" "));
+          Serial.print(sensor_c.c_str());//Send sensor_c to RPI just print (toFloat())
           sensor_c = "";//Clean senor_c for next sensor value
           #if defined(DEBUG)
-            Serial.println(F("end ond and start new sensor"));
+            Serial.println(F(""));
+            Serial.println(F("end and start new sensor"));
           #endif
         }//end if
       }//end for
