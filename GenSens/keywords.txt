@@ -7,13 +7,11 @@
 #######################################
 
 GenSens	KEYWORD1
-Temp_sens KEYWORD1
 
 #######################################
 # Methods and Functions (KEYWORD2)
 #######################################
 
-moteino_init	KEYWORD2
 moteino_receive	KEYWORD2
 moteino_send	KEYWORD2
 mote_sleep		KEYWORD2

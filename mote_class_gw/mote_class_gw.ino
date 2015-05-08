@@ -1,3 +1,37 @@
+/*
+Standart Gateway Trasmition Network v.2
+
+Ricardo Mena C
+ricardo@crcibernetica.com
+http://crcibernetica.com
+
+ License
+ **********************************************************************************
+ This program is free software; you can redistribute it 
+ and/or modify it under the terms of the GNU General    
+ Public License as published by the Free Software       
+ Foundation; either version 3 of the License, or        
+ (at your option) any later version.                    
+                                                        
+ This program is distributed in the hope that it will   
+ be useful, but WITHOUT ANY WARRANTY; without even the  
+ implied warranty of MERCHANTABILITY or FITNESS FOR A   
+ PARTICULAR PURPOSE. See the GNU General Public        
+ License for more details.                              
+                                                        
+ You should have received a copy of the GNU General    
+ Public License along with this program.
+ If not, see <http://www.gnu.org/licenses/>.
+                                                        
+ Licence can be viewed at                               
+ http://www.gnu.org/licenses/gpl-3.0.txt
+
+ Please maintain this license information along with authorship
+ and copyright notices in any redistribution of this code
+ **********************************************************************************
+*/
+
+
 #include <GenSens.h>
 //-----Need to be declared for correct GenSens functioning----
 #include <RFM69.h>
@@ -7,7 +41,7 @@
 
 #define FREQUENCY     RF69_915MHZ
 #define ENCRYPTKEY    "sampleEncryptKey"
-#define SERIAL_BAUD   9600
+#define SERIAL_BAUD   115200 
 //#define DEBUG //uncoment for debuging
 
 GenSens *mio;
@@ -16,18 +50,14 @@ uint8_t node_id = 1;   //This node id
 uint8_t gateway = 300; //Gateway
 //uint8_t t_wait = 1;  //Wait T_WAIT*8 [8 because you sleep 8s] just for simple nodes, not for gateway
 
-//#include "apikey.h" 
-//use tabs to add apikey.h file or uncomment this line
-#define APIKEY "xxxxxxxxxxxxxxxxx" //emoncms Account--> "Write API Key"
-
 String pck = "";//Packet to send
 String msg = "";//Received packets
 
 void setup() {
-  // put your setup code here, to run once:
   mio  = new GenSens(node_id, FREQUENCY, ENCRYPTKEY, gateway);//node#, freq, encryptKey, gateway, LowPower/HighPower(false/true)
   Serial.begin(SERIAL_BAUD);
-  #if defined(DEBUG) 
+  #if defined(DEBUG)
+    Serial.println(F("This is your gateway")); 
     char buff[50];
     sprintf(buff, "\nTransmitting at %d Mhz...", FREQUENCY==RF69_433MHZ ? 433 : FREQUENCY==RF69_868MHZ ? 868 : 915);
     Serial.println(buff);
@@ -39,26 +69,22 @@ void loop(){
     mio->moteino_receive(msg);
     
     if(msg != ""){//Check if msg is empty
-      Serial.print(mio->moteino_id_receive());//Send Id to RPI
-      String sensor_c = "";//
-      for(uint8_t i = 0; i <= msg.length(); i++){
-        if((msg[i] != ';')){
-          sensor_c += msg[i];//Sensor packet
-          #if defined(DEBUG)
-            Serial.print(sensor_c);
-            Serial.print("-");
-          #endif
-        }else{
-          Serial.print(F(" "));
-          Serial.print(sensor_c.c_str());//Send sensor_c to RPI just print (toFloat())
-          sensor_c = "";//Clean senor_c for next sensor value
-          #if defined(DEBUG)
-            Serial.println(F(""));
-            Serial.println(F("end and start new sensor"));
-          #endif
+      #if defined(DEBUG)
+        Serial.print(F("Node ID = "));
+      #endif
+      Serial.print((unsigned int)mio->moteino_id_receive());//Send Id to RPI/Emoncms
+      #if defined(DEBUG)
+        Serial.print(F("Packet received from this node = "));
+      #endif      
+      Serial.print(' ');
+      //while(msg[i] != '\0'){
+      for(uint8_t i = 0; i < msg.length(); i++){
+        if((msg[i] == ';')){
+          msg[i] = ' ';
         }//end if
       }//end for
-      Serial.println();//end transmition to RPI
+      Serial.print(msg);//Print sensor values
+      Serial.println();//end structure transmition to Emoncms
     }//end if
     
     //n_times = 0;//Back to start

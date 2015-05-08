@@ -1,3 +1,36 @@
+/*
+Standart Node Trasmition Network v.2
+
+Ricardo Mena C
+ricardo@crcibernetica.com
+http://crcibernetica.com
+
+ License
+ **********************************************************************************
+ This program is free software; you can redistribute it 
+ and/or modify it under the terms of the GNU General    
+ Public License as published by the Free Software       
+ Foundation; either version 3 of the License, or        
+ (at your option) any later version.                    
+                                                        
+ This program is distributed in the hope that it will   
+ be useful, but WITHOUT ANY WARRANTY; without even the  
+ implied warranty of MERCHANTABILITY or FITNESS FOR A   
+ PARTICULAR PURPOSE. See the GNU General Public        
+ License for more details.                              
+                                                        
+ You should have received a copy of the GNU General    
+ Public License along with this program.
+ If not, see <http://www.gnu.org/licenses/>.
+                                                        
+ Licence can be viewed at                               
+ http://www.gnu.org/licenses/gpl-3.0.txt
+
+ Please maintain this license information along with authorship
+ and copyright notices in any redistribution of this code
+ **********************************************************************************
+*/
+
 #include <GenSens.h>
 //-----Need to be declared for correct GenSens functioning----
 #include <RFM69.h>
@@ -8,21 +41,17 @@
 #define FREQUENCY     RF69_915MHZ
 #define ENCRYPTKEY    "sampleEncryptKey"
 #define SERIAL_BAUD   9600
-#define DEBUG
+//#define DEBUG
 
 GenSens *mio;
 
-uint8_t node_id = 8;  //This node id
+uint8_t node_id = 25;  //This node id
 uint8_t gw_id = 1;    //gatewayId
 uint8_t gateway = 300;//Gateway
 uint8_t t_wait = 1;   //Wait T_WAIT*8 [8 because you sleep 8s]
 uint8_t n_times = 0;  //Time to wait before send the packets 
 
-//#include "apikey.h" 
-//use tabs to add apikey.h file or uncomment this line
-//#define APIKEY "xxxxxxxxxxxxxxxxx" //emoncms Account--> "Write API Key"
-
-String pck = "34.4;2.6;3;4";//Packet to send
+String pck = "";//Packet to send
 String msg = "";//Received packets
 
 void setup() {
@@ -34,6 +63,9 @@ void setup() {
     sprintf(buff, "\nTransmitting at %d Mhz...", FREQUENCY==RF69_433MHZ ? 433 : FREQUENCY==RF69_868MHZ ? 868 : 915);
     Serial.println(buff); 
   //#endif
+  //Add node_id to pck, sometimes radio.SENDERID is 0 -.- no id node #
+//pck +=node_id;
+  pck +="4;2;6;23.4;35.2;54.233;45;35";
    
 }
 
