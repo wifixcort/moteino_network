@@ -41,13 +41,13 @@ http://crcibernetica.com
 #define FREQUENCY     RF69_915MHZ
 #define ENCRYPTKEY    "sampleEncryptKey"
 #define SERIAL_BAUD   9600
-//#define DEBUG
+#define DEBUG
 
 GenSens *mio;
 
 uint8_t node_id = 25;  //This node id
-uint8_t gw_id = 1;    //gatewayId
-uint8_t gateway = 300;//Gateway
+uint8_t gw_id = 2;    //gatewayId
+uint8_t netword_id = 300;//Gateway
 uint8_t t_wait = 1;   //Wait T_WAIT*8 [8 because you sleep 8s]
 uint8_t n_times = 0;  //Time to wait before send the packets 
 
@@ -56,7 +56,7 @@ String msg = "";//Received packets
 
 void setup() {
   // put your setup code here, to run once:
-  mio  = new GenSens(node_id, FREQUENCY, ENCRYPTKEY, gateway);//node#, freq, encryptKey, gateway, LowPower/HighPower(false/true)
+  mio  = new GenSens(node_id, FREQUENCY, ENCRYPTKEY, netword_id);//node#, freq, encryptKey, gateway, LowPower/HighPower(false/true)
     Serial.begin(SERIAL_BAUD);
   //#if defined(DEBUG)
     char buff[50];
@@ -64,8 +64,8 @@ void setup() {
     Serial.println(buff); 
   //#endif
   //Add node_id to pck, sometimes radio.SENDERID is 0 -.- no id node #
-//pck +=node_id;
-  pck +="4;2;6;23.4;35.2;54.233;45;35";
+  pck +=node_id;
+  pck +=";4;2;6;23.4;35.2;54.233;45;35";
    
 }
 
@@ -79,7 +79,7 @@ void loop() {
       }
     #endif
     //pck += ;
-    if(mio->moteino_send(gw_id , pck.c_str(), pck.length(), 2, 100)){
+    if(mio->moteino_send(gw_id, pck.c_str(), pck.length(), 2, 200)){
       #if defined(DEBUG)
         Serial.print(F("ok!"));
       #endif

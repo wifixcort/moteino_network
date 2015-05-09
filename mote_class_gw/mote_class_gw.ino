@@ -54,7 +54,7 @@ String pck = "";//Packet to send
 String msg = "";//Received packets
 
 void setup() {
-  mio  = new GenSens(node_id, FREQUENCY, ENCRYPTKEY, gateway);//node#, freq, encryptKey, gateway, LowPower/HighPower(false/true)
+  mio  = new GenSens(node_id, FREQUENCY, ENCRYPTKEY, gateway, true);//node#, freq, encryptKey, gateway, LowPower/HighPower(false/true)
   Serial.begin(SERIAL_BAUD);
   #if defined(DEBUG)
     Serial.println(F("This is your gateway")); 
@@ -72,12 +72,11 @@ void loop(){
       #if defined(DEBUG)
         Serial.print(F("Node ID = "));
       #endif
-      Serial.print((unsigned int)mio->moteino_id_receive());//Send Id to RPI/Emoncms
+      //Serial.print((unsigned int)mio->moteino_id_receive());//Send Id to RPI/Emoncms
       #if defined(DEBUG)
         Serial.print(F("Packet received from this node = "));
       #endif      
-      Serial.print(' ');
-      //while(msg[i] != '\0'){
+      //Serial.print(' ');
       for(uint8_t i = 0; i < msg.length(); i++){
         if((msg[i] == ';')){
           msg[i] = ' ';
