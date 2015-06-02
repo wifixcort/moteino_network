@@ -82,12 +82,12 @@ long lastWindCheck = 0;
 volatile long lastWindIRQ = 0;
 volatile byte windClicks = 0;
 
-/*
+
 byte windspdavg[120]; //120 bytes to keep track of 2 minute average
 int winddiravg[120]; //120 ints to keep track of 2 minute average
 float windgust_10m[10]; //10 floats to keep track of 10 minute max
 int windgustdirection_10m[10]; //10 ints to keep track of 10 minute max
-*/
+
 volatile float rainHour[60]; //60 floating numbers to keep track of 60 minutes of rain
 
 //These are all the weather values that wunderground expects:
@@ -97,8 +97,8 @@ int winddir = 0; // [0-360 instantaneous wind direction]
 float windspeedmph = 0; // [mph instantaneous wind speed]
 float windgustmph = 0; // [mph current wind gust, using software specific time period]
 int windgustdir = 0; // [0-360 using software specific time period]
-//float windspdmph_avg2m = 0; // [mph 2 minute average wind speed mph]
-//int winddir_avg2m = 0; // [0-360 2 minute average wind direction]
+float windspdmph_avg2m = 0; // [mph 2 minute average wind speed mph]
+int winddir_avg2m = 0; // [0-360 2 minute average wind direction]
 //float windgustmph_10m = 0; // [mph past 10 minutes wind gust mph ]
 //int windgustdir_10m = 0; // [0-360 past 10 minutes wind gust direction]
 float humidity = 0; // [%]
@@ -168,6 +168,45 @@ void setup() {
 }//end setup
 
 void loop(){
+  if(millis() - lastSecond >= 1000){  
+    digitalWrite(STAT1, HIGH); //Blink stat LED
+    lastSecond += 1000;
+    
+    //Calc the wind speed and direction every second for 120 second to get 2 minute average
+    float currentSpeed = get_wind_speed();
+    //float currentSpeed = random(5); //For testing
+    int currentDirection = get_wind_direction();
+    windspdavg[seconds_2m] = (int)currentSpeed;
+    winddiravg[seconds_2m] = currentDirection;
+
+/*    //Check to see if this is a gust for the minute
+    if(currentSpeed > windgust_10m[minutes_10m])
+    {
+      windgust_10m[minutes_10m] = currentSpeed;
+      windgustdirection_10m[minutes_10m] = currentDirection;
+    }
+*/
+    //Check to see if this is a gust for the day
+    if(currentSpeed > windgustmph)
+    {
+      windgustmph = currentSpeed;
+      windgustdir = currentDirection;
+    }
+    if(++seconds > 59)
+    {
+      seconds = 0;
+
+      if(++minutes > 59) minutes = 0;
+      //if(++minutes_10m > 9) minutes_10m = 0;
+
+      rainHour[minutes] = 0; //Zero out this minute's rainfall amount
+      //windgust_10m[minutes_10m] = 0; //Zero out this minute's gust
+    } 
+  }
+  
+  
+  
+  
   //if(n_times >= T_WAIT){
    //-----------This Station--------------
   calcWeather(); //Go calc all the various sensors
@@ -176,8 +215,8 @@ void loop(){
   pck = "";//Clean packet
   pck += node_id;//This node
   pck += " ";
-  pck += winddir; pck += " ";
-  pck += windspeedmph; pck += " ";
+  pck += winddir_avg2m; /*winddir;*/ pck += " ";
+  pck += windspdmph_avg2m;/*windspeedmph;*/ pck += " ";
   pck += humidity; pck += " ";
   pck += temp_c; pck += " ";
   pck += rainin; pck += " ";
