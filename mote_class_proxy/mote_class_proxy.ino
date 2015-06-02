@@ -47,7 +47,7 @@ http://crcibernetica.com
 #define FREQUENCY     RF69_915MHZ
 #define ENCRYPTKEY    "sampleEncryptKey"
 #define SERIAL_BAUD   9600
-//#define DEBUG //uncoment for debuging
+#define DEBUG //uncoment for debuging
 //#define DEBUG1 //uncoment for debuging
 
 GenSens *mio;
@@ -174,7 +174,7 @@ void loop(){
 
   temp_c = (tempf-32)*0.555556;
   pck = "";//Clean packet
-  pck += (unsigned int)node_id;//This node
+  pck += node_id;//This node
   pck += " ";
   pck += winddir; pck += " ";
   pck += windspeedmph; pck += " ";

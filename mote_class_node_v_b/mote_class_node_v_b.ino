@@ -37,41 +37,59 @@ http://crcibernetica.com
 #include <SPI.h>
 #include <LowPower.h>   //https://github.com/rocketscream/Low-Power
 #include <Wire.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
 //------------------------------------------------------------
 
 //---------
-#include <SHT1x.h>
+//#include <SHT1x.h>
 #include "Adafruit_SI1145.h"
 #include "DHT.h"
+
 //---------
 
 #define FREQUENCY     RF69_915MHZ
 #define ENCRYPTKEY    "sampleEncryptKey"
 #define SERIAL_BAUD   9600
-//#define DEBUG
+#define DEBUG
 #define DHTTYPE DHT11   // DHT 11 
 
-uint8_t node_id = 8;  //This node id
+uint8_t node_id = 10;  //This node id
 uint8_t gw_id = 2;    //gatewayId
 uint8_t netword_id = 300;//Gateway
 uint8_t t_wait = 3;   //Wait T_WAIT*8 [8 because you sleep 8s]
 uint8_t n_times = 0;  //Time to wait before send the packets
 //-------------------------
-uint8_t data_pin = 6; //SHT10 Data Pin
-uint8_t clock_pin = 7; //SHT10 Clock Pin
+//uint8_t data_pin = 6; //SHT10 Data Pin
+//uint8_t clock_pin = 7; //SHT10 Clock Pin
+
 uint8_t dht11_pin = 5; //DHT11 pin
 
+uint8_t one_wire_bus = 7;
+
 GenSens *mio;
-SHT1x sht1x(data_pin, clock_pin);//Soil
+//SHT1x sht1x(data_pin, clock_pin);//Soil
 Adafruit_SI1145 uv = Adafruit_SI1145();//UV Light
 //Adafruit_SI1145 *uv;// = Adafruit_SI1145();//UV Light
 DHT dht(dht11_pin, DHTTYPE);// Initialize DHT sensor for normal 16mhz Arduino
+
+OneWire oneWire(one_wire_bus);
+DallasTemperature sensors(&oneWire);
+DeviceAddress tempDeviceAddress;
+uint8_t resolution = 9;
 
 
 String pck = "";//Packet to send
 String msg = "";//Received packets
 
 void setup() {
+  pinMode(A1, OUTPUT);
+  pinMode(A1, LOW);
+  
+  sensors.begin();
+  sensors.getAddress(tempDeviceAddress, 0);
+  sensors.setResolution(tempDeviceAddress, resolution);
+  
   dht.begin();
   mio  = new GenSens(node_id, FREQUENCY, ENCRYPTKEY, netword_id);//node#, freq, encryptKey, gateway, LowPower/HighPower(false/true)
   Serial.begin(SERIAL_BAUD);
@@ -105,14 +123,23 @@ void loop() {
         }//end if
       #endif
     }//end if
+    digitalWrite(A1, HIGH); // Turn on Soil Moisture Sensor
+    sensors.requestTemperatures();
+    pck += sensors.getTempCByIndex(0);
+    pck += ";";
+    pck += analogRead(A0);
+    pck += ";";
+    
+    digitalWrite(A1, LOW); //Turn off Soil Moisture sensor
+    
     //temp_c_sht10 = sht1x.readTemperatureC();
     //humidity_sht10 = sht1x.readHumidity();
     //Read SHT10 Sensor Soil Temp and Humidity
-    pck += sht1x.readTemperatureC();//temp_c_sht10;
+    /*    pck += sht1x.readTemperatureC();//temp_c_sht10;
     pck += ";";
     pck += sht1x.readHumidity();//humidity_sht10;
     pck += ";";//Uncomment for more data to send
-    
+    */
     //Read SI1145 UV Light sensor
     pck += uv.readVisible();
     pck += ";";
