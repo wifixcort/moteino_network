@@ -60,6 +60,9 @@ uint8_t n_times = 0;  //Time to wait before send the packets
 uint8_t data_pin = 6; //SHT10 Data Pin
 uint8_t clock_pin = 7; //SHT10 Clock Pin
 uint8_t dht11_pin = 5; //DHT11 pin
+//SI145
+//A4 SDA
+//A5 SCL
 
 GenSens *mio;
 SHT1x sht1x(data_pin, clock_pin);//Soil

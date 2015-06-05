@@ -42,6 +42,9 @@ http://crcibernetica.com
 #include "MPL3115A2.h" //Pressure sensor
 #include "HTU21D.h" //Humidity sensor
 
+#include <PinChangeInt.h>
+
+
 //------------------------------------------------------------
 
 #define FREQUENCY     RF69_915MHZ
@@ -58,7 +61,8 @@ HTU21D myHumidity; //Create an instance of the humidity sensor
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 // digital I/O pins
 const byte WSPEED = 3;
-const byte RAIN = 4;//Original pin 2. Moteino use this pin
+//const byte RAIN = 4;//Original pin 2. Moteino use this pin
+const byte RAIN = 5;
 const byte STAT1 = 7;
 const byte STAT2 = 8;//not needed
 //Do not use pin 8 if moteino have flash memory
@@ -83,8 +87,8 @@ volatile long lastWindIRQ = 0;
 volatile byte windClicks = 0;
 
 
-byte windspdavg[120]; //120 bytes to keep track of 2 minute average
-int winddiravg[120]; //120 ints to keep track of 2 minute average
+byte windspdavg[60]; //120 bytes to keep track of 2 minute average
+int winddiravg[60]; //120 ints to keep track of 2 minute average
 float windgust_10m[10]; //10 floats to keep track of 10 minute max
 int windgustdirection_10m[10]; //10 ints to keep track of 10 minute max
 
@@ -127,15 +131,25 @@ String msg = "";//Received packets
 unsigned long prev_time = 0;
 unsigned long time_to_send = 1000;//1000*Ns
 
+//For speed and windir 1 minute average
+unsigned long cero_time = 0;
+unsigned long time_to_read = 1000;//1000*Ns
+unsigned int minute = 0;
+
+/*My interrupts modif*/
+unsigned int count = 0;
+
 
 void setup() {
+  #if defined(DEBUG)
+    digitalWrite(9, HIGH);
+  #endif
   pinMode(STAT1, OUTPUT); //Status LED Blue
   pinMode(STAT2, OUTPUT); //Status LED Green
   pinMode(WSPEED, INPUT_PULLUP); // input from wind meters windspeed sensor
   pinMode(RAIN, INPUT_PULLUP); // input from wind meters rain gauge sensor
   pinMode(REFERENCE_3V3, INPUT);
   pinMode(LIGHT, INPUT);
-  
   //Configure the pressure sensor
   myPressure.begin(); // Get sensor online
   myPressure.setModeBarometer(); // Measure pressure in Pascals from 20 to 110 kPa
@@ -150,9 +164,12 @@ void setup() {
   time_to_send *= 60;//Upload time data of Weather Station
 
   // attach external interrupt pins to IRQ functions
-  attachInterrupt(0, rainIRQ, FALLING);
+  //attachInterrupt(0, rainIRQ, FALLING);
   attachInterrupt(1, wspeedIRQ, FALLING);
 
+  digitalWrite(RAIN, HIGH);  
+  PCintPort::attachInterrupt(RAIN, rainISR, FALLING);//button_ISR
+  //rainISR
   // turn on interrupts
   interrupts();
   
@@ -168,16 +185,31 @@ void setup() {
 }//end setup
 
 void loop(){
+  #if defined(DEBUG)
+    Serial.println(F("node up"));
+  #endif
+    //Serial.println(count);
   if(millis() - lastSecond >= 1000){  
     digitalWrite(STAT1, HIGH); //Blink stat LED
     lastSecond += 1000;
     
     //Calc the wind speed and direction every second for 120 second to get 2 minute average
-    float currentSpeed = get_wind_speed();
-    //float currentSpeed = random(5); //For testing
     int currentDirection = get_wind_direction();
-    windspdavg[seconds_2m] = (int)currentSpeed;
-    winddiravg[seconds_2m] = currentDirection;
+    float currentSpeed = get_wind_speed();
+    unsigned long now_time = millis();
+    if(now_time - cero_time > time_to_read) {
+      
+      windspdavg[minute] = (int)currentSpeed;
+      winddiravg[minute] = currentDirection;
+      // save the last time
+      cero_time = now_time;
+      minute++;
+      if(minute > 60){
+        minute =0;
+      }
+    }//if /speed reads
+    //float currentSpeed = random(5); //For testing
+
 
 /*    //Check to see if this is a gust for the minute
     if(currentSpeed > windgust_10m[minutes_10m])
@@ -211,19 +243,20 @@ void loop(){
    //-----------This Station--------------
   calcWeather(); //Go calc all the various sensors
 
-  temp_c = (tempf-32)*0.555556;
+  //temp_c = (tempf-32)*0.555556;
   pck = "";//Clean packet
   pck += node_id;//This node
   pck += " ";
   pck += winddir_avg2m; /*winddir;*/ pck += " ";
   pck += windspdmph_avg2m;/*windspeedmph;*/ pck += " ";
   pck += humidity; pck += " ";
-  pck += temp_c; pck += " ";
+  pck += tempf; pck += " ";
   pck += rainin; pck += " ";
   pck += dailyrainin; pck += " ";
   pck += pressure; pck += " ";
   pck += batt_lvl; pck += " ";
   pck += light_lvl;
+  
   //-------------------------------------
     
   //---------All nodes---------------
@@ -300,25 +333,33 @@ void loop(){
   Serial.flush();
   //mio->mote_sleep();
   //LowPower.powerDown(SLEEP_2S, ADC_OFF, BOD_OFF);
-}
+}//end loop
+
+
+//Interrupt without debounce
+void button_ISR() {
+     count++;
+  //last_interrupt_time=millis();
+  // Serial.println ("Awake");
+}//end button_ISR
 
 //Interrupt routines (these are called by the hardware interrupts, not by the main code)
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-void rainIRQ()
+void rainISR()
 // Count rain gauge bucket tips as they occur
 // Activated by the magnet and reed switch in the rain gauge, attached to input D2
 {
   raintime = millis(); // grab current time
   raininterval = raintime - rainlast; // calculate interval between this and last event
-
-    if (raininterval > 10) // ignore switch-bounce glitches less than 10mS after initial edge
+  
+  if (raininterval > 10) // ignore switch-bounce glitches less than 10mS after initial edge
   {
     dailyrainin += 0.011; //Each dump is 0.011" of water
     rainHour[minutes] += 0.011; //Increase this minute's amount of rain
-
+  
     rainlast = raintime; // set up for next event
-  }
-}
+  }//end if
+}//end rainISR
 
 void wspeedIRQ()
 // Activated by the magnet in the anemometer (2 ticks per rotation), attached to input D3
@@ -346,7 +387,8 @@ void calcWeather()
   //Serial.print(temp_h, 2);
 
   //Calc tempf from pressure sensor
-  tempf = myPressure.readTempF();
+  tempf = myPressure.readTemp();
+//  myPressure.readTempF();
   //Serial.print(" TempP:");
   //Serial.print(tempf, 2);
 
@@ -357,6 +399,20 @@ void calcWeather()
 
   //Calc battery level
   batt_lvl = get_battery_level();  
+  
+  //Calc windspdmph_avg2m
+  float temp = 0;
+  for(int i = 0 ; i < 60; i++)
+    temp += windspdavg[i];
+  temp /= 160.0;
+  windspdmph_avg2m = temp;
+
+  //Calc winddir_avg2m
+  temp = 0; //Can't use winddir_avg2m because it's an int
+  for(int i = 0 ; i < 60 ; i++)
+    temp += winddiravg[i];
+  temp /= 60;
+  winddir_avg2m = temp;  
   
   
   //Total rainfall for the day is calculated within the interrupt
@@ -448,7 +504,7 @@ int get_wind_direction()
   if (adc < 940) return (293);
   if (adc < 967) return (315);
   if (adc < 990) return (270);
-  return (-1); // error, disconnected?
+  return (0); // error, disconnected?
 }
 
 
