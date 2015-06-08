@@ -42,20 +42,22 @@ http://crcibernetica.com
 #include "MPL3115A2.h" //Pressure sensor
 #include "HTU21D.h" //Humidity sensor
 
-#include <PinChangeInt.h>
-
-
 //------------------------------------------------------------
 
 #define FREQUENCY     RF69_915MHZ
 #define ENCRYPTKEY    "sampleEncryptKey"
 #define SERIAL_BAUD   9600
-#define DEBUG //uncoment for debuging
+//#define DEBUG //uncoment for debuging
 //#define DEBUG1 //uncoment for debuging
 
 GenSens *mio;
 MPL3115A2 myPressure; //Create an instance of the pressure sensor
 HTU21D myHumidity; //Create an instance of the humidity sensor
+
+//------------Network identifiers-----------------
+uint8_t node_id = 2;   //This node id
+uint8_t gw_id = 1;    //gatewayId
+uint8_t netword_id = 215; //Gateway
 
 //-------------------Hardware pin definitions--------------------------------
 //-=-=-=-=-=-=-=-=-=-=-=-=-=-=
@@ -87,8 +89,8 @@ volatile long lastWindIRQ = 0;
 volatile byte windClicks = 0;
 
 
-byte windspdavg[60]; //120 bytes to keep track of 2 minute average
-int winddiravg[60]; //120 ints to keep track of 2 minute average
+byte windspdavg[60]; //60 bytes to keep track of 1 minute average
+int winddiravg[60]; //60 ints to keep track of 1 minute average
 float windgust_10m[10]; //10 floats to keep track of 10 minute max
 int windgustdirection_10m[10]; //10 ints to keep track of 10 minute max
 
@@ -120,10 +122,6 @@ float light_lvl = 455; //[analog value from 0 to 1023]
 // volatiles are subject to modification by IRQs
 volatile unsigned long raintime, rainlast, raininterval, rain;
 
-
-uint8_t node_id = 2;   //This node id
-uint8_t gw_id = 1;    //gatewayId
-uint8_t netword_id = 300; //Gateway
 //uint8_t t_wait = 1;  //Wait T_WAIT*8 [8 because you sleep 8s] just for simple nodes, not for gateway
 
 String pck = "";//Packet to send
@@ -134,11 +132,9 @@ unsigned long time_to_send = 1000;//1000*Ns
 //For speed and windir 1 minute average
 unsigned long cero_time = 0;
 unsigned long time_to_read = 1000;//1000*Ns
-unsigned int minute = 0;
+volatile unsigned int minute = 0;
 
-/*My interrupts modif*/
-unsigned int count = 0;
-
+uint8_t count = 0;//Debug purpose
 
 void setup() {
   #if defined(DEBUG)
@@ -150,6 +146,10 @@ void setup() {
   pinMode(RAIN, INPUT_PULLUP); // input from wind meters rain gauge sensor
   pinMode(REFERENCE_3V3, INPUT);
   pinMode(LIGHT, INPUT);
+  
+  //digitalWrite(RAIN, HIGH);
+  initialise_interrupt();
+  
   //Configure the pressure sensor
   myPressure.begin(); // Get sensor online
   myPressure.setModeBarometer(); // Measure pressure in Pascals from 20 to 110 kPa
@@ -166,13 +166,8 @@ void setup() {
   // attach external interrupt pins to IRQ functions
   //attachInterrupt(0, rainIRQ, FALLING);
   attachInterrupt(1, wspeedIRQ, FALLING);
-
-  digitalWrite(RAIN, HIGH);  
-  PCintPort::attachInterrupt(RAIN, rainISR, FALLING);//button_ISR
-  //rainISR
   // turn on interrupts
   interrupts();
-  
   
   mio  = new GenSens(node_id, FREQUENCY, ENCRYPTKEY, netword_id);//node#, freq, encryptKey, gateway, LowPower/HighPower(false/true)
   Serial.begin(SERIAL_BAUD);
@@ -186,9 +181,8 @@ void setup() {
 
 void loop(){
   #if defined(DEBUG)
-    Serial.println(F("node up"));
+    Serial.println(count);
   #endif
-    //Serial.println(count);
   if(millis() - lastSecond >= 1000){  
     digitalWrite(STAT1, HIGH); //Blink stat LED
     lastSecond += 1000;
@@ -198,43 +192,27 @@ void loop(){
     float currentSpeed = get_wind_speed();
     unsigned long now_time = millis();
     if(now_time - cero_time > time_to_read) {
-      
       windspdavg[minute] = (int)currentSpeed;
       winddiravg[minute] = currentDirection;
-      // save the last time
-      cero_time = now_time;
+      cero_time = now_time;// save the last time
       minute++;
       if(minute > 60){
         minute =0;
       }
     }//if /speed reads
-    //float currentSpeed = random(5); //For testing
 
-
-/*    //Check to see if this is a gust for the minute
-    if(currentSpeed > windgust_10m[minutes_10m])
-    {
-      windgust_10m[minutes_10m] = currentSpeed;
-      windgustdirection_10m[minutes_10m] = currentDirection;
-    }
-*/
     //Check to see if this is a gust for the day
-    if(currentSpeed > windgustmph)
-    {
+    if(currentSpeed > windgustmph){
       windgustmph = currentSpeed;
       windgustdir = currentDirection;
     }
-    if(++seconds > 59)
-    {
+    if(++seconds > 59){
       seconds = 0;
-
       if(++minutes > 59) minutes = 0;
-      //if(++minutes_10m > 9) minutes_10m = 0;
-
       rainHour[minutes] = 0; //Zero out this minute's rainfall amount
       //windgust_10m[minutes_10m] = 0; //Zero out this minute's gust
-    } 
-  }
+    }//end if(++seconds > 59)
+  }//end if(millis() - lastSecond >= 1000)
   
   
   
@@ -243,19 +221,22 @@ void loop(){
    //-----------This Station--------------
   calcWeather(); //Go calc all the various sensors
 
-  //temp_c = (tempf-32)*0.555556;
   pck = "";//Clean packet
   pck += node_id;//This node
   pck += " ";
   pck += winddir_avg2m; /*winddir;*/ pck += " ";
   pck += windspdmph_avg2m;/*windspeedmph;*/ pck += " ";
   pck += humidity; pck += " ";
-  pck += tempf; pck += " ";
+  pck += temp_c; pck += " ";
   pck += rainin; pck += " ";
   pck += dailyrainin; pck += " ";
   pck += pressure; pck += " ";
   pck += batt_lvl; pck += " ";
   pck += light_lvl;
+  
+  #if defined(DEBUG)
+    Serial.println(pck);
+  #endif
   
   //-------------------------------------
     
@@ -267,25 +248,6 @@ void loop(){
       Serial.println(msg);
     }
   #endif
-    // Not need for now just receive from nodes and send it to gateway
-    /*if(msg != ""){//Check if msg is empty
-      #if defined(DEBUG)
-        Serial.print(F("Node ID = "));
-      #endif
-      Serial.print((unsigned int)mio->moteino_id_receive());//Send Id to RPI/Emoncms
-      #if defined(DEBUG)
-        Serial.print(F("Packet received from this node = "));
-      #endif      
-      Serial.print(' ');
-      //while(msg[i] != '\0'){
-      for(uint8_t i = 0; i < msg.length(); i++){
-        if((msg[i] == ';')){
-          msg[i] = ' ';
-        }//end if
-      }//end for
-      Serial.print(msg);//Print sensor values
-      Serial.println();//end structure transmition to Emoncms
-    }//end if  */
     
   //Time!!!
   unsigned long current_time = millis();
@@ -321,45 +283,32 @@ void loop(){
     }//end if
   }//end if
 
-  //---Send wheater sensors and pilars sensor to gateway------
-
-    
-  //msg = "";//Start again
-    //---------------------------------------
-    //n_times = 0;//Back to start
-  //}else{
-   // n_times++;//wait more
-  //}  
   Serial.flush();
-  //mio->mote_sleep();
-  //LowPower.powerDown(SLEEP_2S, ADC_OFF, BOD_OFF);
 }//end loop
 
+//Manual interrupt configurations for pin 5 
+void initialise_interrupt(){
+  cli();//Disable interrupts
+  PCICR |= (1<<PCIE2);
+  PCMSK2 |= (1<<PCINT21);
+  MCUCR = (1<<ISC01) | (1<<ISC00);
+  sei();//Enable interrupts
+}
 
 //Interrupt without debounce
-void button_ISR() {
-     count++;
-  //last_interrupt_time=millis();
-  // Serial.println ("Awake");
+ISR(PCINT2_vect){
+  if(digitalRead(5)==0){
+    raintime = millis(); // grab current time
+    raininterval = raintime - rainlast; // calculate interval between this and last event
+    
+    if (raininterval > 10) // ignore switch-bounce glitches less than 10mS after initial edge
+    {
+      dailyrainin += 0.011; //Each dump is 0.011" of water
+      rainHour[minutes] += 0.011; //Increase this minute's amount of rain
+      rainlast = raintime; // set up for next event
+    }//end if
+  }//end if 
 }//end button_ISR
-
-//Interrupt routines (these are called by the hardware interrupts, not by the main code)
-//-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-void rainISR()
-// Count rain gauge bucket tips as they occur
-// Activated by the magnet and reed switch in the rain gauge, attached to input D2
-{
-  raintime = millis(); // grab current time
-  raininterval = raintime - rainlast; // calculate interval between this and last event
-  
-  if (raininterval > 10) // ignore switch-bounce glitches less than 10mS after initial edge
-  {
-    dailyrainin += 0.011; //Each dump is 0.011" of water
-    rainHour[minutes] += 0.011; //Increase this minute's amount of rain
-  
-    rainlast = raintime; // set up for next event
-  }//end if
-}//end rainISR
 
 void wspeedIRQ()
 // Activated by the magnet in the anemometer (2 ticks per rotation), attached to input D3
@@ -382,15 +331,9 @@ void calcWeather()
 
   //Calc humidity
   humidity = myHumidity.readHumidity();
-  //float temp_h = myHumidity.readTemperature();
-  //Serial.print(" TempH:");
-  //Serial.print(temp_h, 2);
 
   //Calc tempf from pressure sensor
-  tempf = myPressure.readTemp();
-//  myPressure.readTempF();
-  //Serial.print(" TempP:");
-  //Serial.print(tempf, 2);
+  temp_c = myPressure.readTemp();
 
   pressure = myPressure.readPressure();
 
@@ -404,7 +347,7 @@ void calcWeather()
   float temp = 0;
   for(int i = 0 ; i < 60; i++)
     temp += windspdavg[i];
-  temp /= 160.0;
+  temp /= 60.0;
   windspdmph_avg2m = temp;
 
   //Calc winddir_avg2m
@@ -431,8 +374,6 @@ float get_light_level()
   float operatingVoltage = analogRead(REFERENCE_3V3);
 
   float lightSensor = analogRead(LIGHT);
-  //Serial.print("Light sensor = ");
-  //Serial.println(lightSensor);
   
   operatingVoltage = 3.3 / operatingVoltage; //The reference voltage is 3.3V
   
@@ -473,10 +414,6 @@ float get_wind_speed()
   lastWindCheck = millis();
 
   windSpeed *= 1.492; //4 * 1.492 = 5.968MPH
-
-   //Serial.println();
-   //Serial.print("Windspeed:");
-   //Serial.println(windSpeed);
 
   return(windSpeed);
 }
