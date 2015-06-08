@@ -47,7 +47,7 @@ http://crcibernetica.com
 #define FREQUENCY     RF69_915MHZ
 #define ENCRYPTKEY    "sampleEncryptKey"
 #define SERIAL_BAUD   9600
-//#define DEBUG //uncoment for debuging
+#define DEBUG //uncoment for debuging
 //#define DEBUG1 //uncoment for debuging
 
 GenSens *mio;
@@ -64,9 +64,9 @@ uint8_t netword_id = 215; //Gateway
 // digital I/O pins
 const byte WSPEED = 3;
 //const byte RAIN = 4;//Original pin 2. Moteino use this pin
-const byte RAIN = 5;
+const byte RAIN = 8;
 const byte STAT1 = 7;
-const byte STAT2 = 8;//not needed
+//const byte STAT2 = 8;//not needed
 //Do not use pin 8 if moteino have flash memory
 
 // analog I/O pins
@@ -82,7 +82,7 @@ long lastSecond; //The millis counter to see when a second rolls by
 byte seconds; //When it hits 60, increase the current minute
 byte seconds_2m; //Keeps track of the "wind speed/dir avg" over last 2 minutes array of data
 byte minutes; //Keeps track of where we are in various arrays of data
-byte minutes_10m; //Keeps track of where we are in wind gust/dir over last 10 minutes array of data
+//byte minutes_10m; //Keeps track of where we are in wind gust/dir over last 10 minutes array of data
 
 long lastWindCheck = 0;
 volatile long lastWindIRQ = 0;
@@ -91,8 +91,8 @@ volatile byte windClicks = 0;
 
 byte windspdavg[60]; //60 bytes to keep track of 1 minute average
 int winddiravg[60]; //60 ints to keep track of 1 minute average
-float windgust_10m[10]; //10 floats to keep track of 10 minute max
-int windgustdirection_10m[10]; //10 ints to keep track of 10 minute max
+//float windgust_10m[10]; //10 floats to keep track of 10 minute max
+//int windgustdirection_10m[10]; //10 ints to keep track of 10 minute max
 
 volatile float rainHour[60]; //60 floating numbers to keep track of 60 minutes of rain
 
@@ -108,7 +108,7 @@ int winddir_avg2m = 0; // [0-360 2 minute average wind direction]
 //float windgustmph_10m = 0; // [mph past 10 minutes wind gust mph ]
 //int windgustdir_10m = 0; // [0-360 past 10 minutes wind gust direction]
 float humidity = 0; // [%]
-float tempf = 0; // [temperature F]
+//float tempf = 0; // [temperature F]
 float temp_c = 0;// [temperature C]
 float rainin = 0; // [rain inches over the past hour)] -- the accumulated rainfall in the past 60 min
 volatile float dailyrainin = 0; // [rain inches so far today in local time]
@@ -149,6 +149,7 @@ void setup() {
   
   //digitalWrite(RAIN, HIGH);
   initialise_interrupt();
+ // interrupts();  
   
   //Configure the pressure sensor
   myPressure.begin(); // Get sensor online
@@ -177,14 +178,16 @@ void setup() {
     sprintf(buff, "\nTransmitting at %d Mhz...", FREQUENCY==RF69_433MHZ ? 433 : FREQUENCY==RF69_868MHZ ? 868 : 915);
     Serial.println(buff);
   #endif
+  Serial.print("Free 1 = ");
+  Serial.println(freeRam());
 }//end setup
 
 void loop(){
   #if defined(DEBUG)
-    Serial.println(count);
+   // Serial.println(count);
   #endif
   if(millis() - lastSecond >= 1000){  
-    digitalWrite(STAT1, HIGH); //Blink stat LED
+    //digitalWrite(STAT1, HIGH); //Blink stat LED
     lastSecond += 1000;
     
     //Calc the wind speed and direction every second for 120 second to get 2 minute average
@@ -214,7 +217,8 @@ void loop(){
     }//end if(++seconds > 59)
   }//end if(millis() - lastSecond >= 1000)
   
-  
+  Serial.print("Free 2 = ");
+  Serial.println(freeRam());
   
   
   //if(n_times >= T_WAIT){
@@ -239,7 +243,8 @@ void loop(){
   #endif
   
   //-------------------------------------
-    
+      Serial.print("Free 3 = ");
+  Serial.println(freeRam());
   //---------All nodes---------------
   mio->moteino_receive(msg);
   #if defined(DEBUG1)
@@ -248,7 +253,8 @@ void loop(){
       Serial.println(msg);
     }
   #endif
-    
+      Serial.print("Free 4 = ");
+  Serial.println(freeRam());
   //Time!!!
   unsigned long current_time = millis();
   if(current_time - prev_time > time_to_send) {
@@ -268,7 +274,8 @@ void loop(){
       }//end if
     }//end if
   }//end if   
-
+   Serial.print("Free 5 = ");
+  Serial.println(freeRam());
   if(msg != ""){//Check empty msg
     if(mio->moteino_send(gw_id, msg.c_str(), msg.length(), 2, 100)){//Wheater Station
       #if defined(DEBUG)
@@ -282,22 +289,34 @@ void loop(){
       #endif
     }//end if
   }//end if
-
+  
+  Serial.print("Free 6 = ");
+  Serial.println(freeRam());
+  
   Serial.flush();
 }//end loop
 
+    int freeRam () 
+    {
+      extern int __heap_start, *__brkval; 
+      int v; 
+      return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
+    }
+
 //Manual interrupt configurations for pin 5 
 void initialise_interrupt(){
-  cli();//Disable interrupts
-  PCICR |= (1<<PCIE2);
-  PCMSK2 |= (1<<PCINT21);
+ // cli();//Disable interrupts
+  PCICR |= (1<<PCIE0);
+  //PCMSK2 |= (1<<PCINT21);
+  PCMSK0 |= (1<<PCINT0);
+
   MCUCR = (1<<ISC01) | (1<<ISC00);
-  sei();//Enable interrupts
+  //sei();//Enable interrupts
 }
 
 //Interrupt without debounce
-ISR(PCINT2_vect){
-  if(digitalRead(5)==0){
+ISR(PCINT0_vect){
+  if(digitalRead(8)==0){
     raintime = millis(); // grab current time
     raininterval = raintime - rainlast; // calculate interval between this and last event
     
@@ -307,7 +326,7 @@ ISR(PCINT2_vect){
       rainHour[minutes] += 0.011; //Increase this minute's amount of rain
       rainlast = raintime; // set up for next event
     }//end if
-  }//end if 
+  }//end if
 }//end button_ISR
 
 void wspeedIRQ()
