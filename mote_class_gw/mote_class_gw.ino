@@ -47,7 +47,7 @@ http://crcibernetica.com
 GenSens *mio;
 
 uint8_t node_id = 1;   //This node id
-uint8_t gateway = 300; //Gateway
+uint8_t gateway = 215; //Gateway
 //uint8_t t_wait = 1;  //Wait T_WAIT*8 [8 because you sleep 8s] just for simple nodes, not for gateway
 
 String pck = "";//Packet to send

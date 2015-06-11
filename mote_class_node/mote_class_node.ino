@@ -44,8 +44,8 @@ http://crcibernetica.com
 //#define DEBUG
 
 uint8_t node_id = 8;  //This node id
-uint8_t gw_id = 1;    //gatewayId
-uint8_t netword_id = 300;//Gateway
+uint8_t gw_id = 2;    //gatewayId
+uint8_t netword_id = 215;//Gateway
 uint8_t t_wait = 3;   //Wait T_WAIT*8 [8 because you sleep 8s]
 uint8_t n_times = 0;  //Time to wait before send the packets
 

@@ -47,8 +47,9 @@ http://crcibernetica.com
 #define FREQUENCY     RF69_915MHZ
 #define ENCRYPTKEY    "sampleEncryptKey"
 #define SERIAL_BAUD   9600
-#define DEBUG //uncoment for debuging
+//#define DEBUG //uncoment for debuging
 //#define DEBUG1 //uncoment for debuging
+//#define FREERAM
 
 GenSens *mio;
 MPL3115A2 myPressure; //Create an instance of the pressure sensor
@@ -103,7 +104,7 @@ int winddir = 0; // [0-360 instantaneous wind direction]
 float windspeedmph = 0; // [mph instantaneous wind speed]
 float windgustmph = 0; // [mph current wind gust, using software specific time period]
 int windgustdir = 0; // [0-360 using software specific time period]
-float windspdmph_avg2m = 0; // [mph 2 minute average wind speed mph]
+float windspdmph_avg1m = 0; // [mph 2 minute average wind speed mph]
 int winddir_avg2m = 0; // [0-360 2 minute average wind direction]
 //float windgustmph_10m = 0; // [mph past 10 minutes wind gust mph ]
 //int windgustdir_10m = 0; // [0-360 past 10 minutes wind gust direction]
@@ -129,10 +130,6 @@ String msg = "";//Received packets
 unsigned long prev_time = 0;
 unsigned long time_to_send = 1000;//1000*Ns
 
-//For speed and windir 1 minute average
-unsigned long cero_time = 0;
-unsigned long time_to_read = 1000;//1000*Ns
-volatile unsigned int minute = 0;
 
 uint8_t count = 0;//Debug purpose
 
@@ -141,7 +138,7 @@ void setup() {
     digitalWrite(9, HIGH);
   #endif
   pinMode(STAT1, OUTPUT); //Status LED Blue
-  pinMode(STAT2, OUTPUT); //Status LED Green
+  //pinMode(STAT2, OUTPUT); //Status LED Green
   pinMode(WSPEED, INPUT_PULLUP); // input from wind meters windspeed sensor
   pinMode(RAIN, INPUT_PULLUP); // input from wind meters rain gauge sensor
   pinMode(REFERENCE_3V3, INPUT);
@@ -178,8 +175,10 @@ void setup() {
     sprintf(buff, "\nTransmitting at %d Mhz...", FREQUENCY==RF69_433MHZ ? 433 : FREQUENCY==RF69_868MHZ ? 868 : 915);
     Serial.println(buff);
   #endif
-  Serial.print("Free 1 = ");
-  Serial.println(freeRam());
+  #if defined(FREERAM)
+    Serial.print("Free 1 = ");
+    Serial.println(freeRam());
+  #endif
 }//end setup
 
 void loop(){
@@ -190,20 +189,12 @@ void loop(){
     //digitalWrite(STAT1, HIGH); //Blink stat LED
     lastSecond += 1000;
     
+    if((++seconds_2m) > 59){ seconds_2m = 0;}
     //Calc the wind speed and direction every second for 120 second to get 2 minute average
     int currentDirection = get_wind_direction();
     float currentSpeed = get_wind_speed();
-    unsigned long now_time = millis();
-    if(now_time - cero_time > time_to_read) {
-      windspdavg[minute] = (int)currentSpeed;
-      winddiravg[minute] = currentDirection;
-      cero_time = now_time;// save the last time
-      minute++;
-      if(minute > 60){
-        minute =0;
-      }
-    }//if /speed reads
-
+    windspdavg[seconds_2m] = (int)currentSpeed;
+    winddiravg[seconds_2m] = currentDirection;    
     //Check to see if this is a gust for the day
     if(currentSpeed > windgustmph){
       windgustmph = currentSpeed;
@@ -217,9 +208,10 @@ void loop(){
     }//end if(++seconds > 59)
   }//end if(millis() - lastSecond >= 1000)
   
-  Serial.print("Free 2 = ");
-  Serial.println(freeRam());
-  
+  #if defined(FREERAM)
+    Serial.print("Free 2 = ");
+    Serial.println(freeRam());
+  #endif
   
   //if(n_times >= T_WAIT){
    //-----------This Station--------------
@@ -229,7 +221,7 @@ void loop(){
   pck += node_id;//This node
   pck += " ";
   pck += winddir_avg2m; /*winddir;*/ pck += " ";
-  pck += windspdmph_avg2m;/*windspeedmph;*/ pck += " ";
+  pck += windspdmph_avg1m;/*windspeedmph;*/ pck += " ";
   pck += humidity; pck += " ";
   pck += temp_c; pck += " ";
   pck += rainin; pck += " ";
@@ -243,8 +235,10 @@ void loop(){
   #endif
   
   //-------------------------------------
-      Serial.print("Free 3 = ");
-  Serial.println(freeRam());
+  #if defined(FREERAM)  
+    Serial.print("Free 3 = ");
+    Serial.println(freeRam());
+  #endif
   //---------All nodes---------------
   mio->moteino_receive(msg);
   #if defined(DEBUG1)
@@ -253,8 +247,10 @@ void loop(){
       Serial.println(msg);
     }
   #endif
-      Serial.print("Free 4 = ");
-  Serial.println(freeRam());
+  #if defined(FREERAM)
+    Serial.print("Free 4 = ");
+    Serial.println(freeRam());
+  #endif
   //Time!!!
   unsigned long current_time = millis();
   if(current_time - prev_time > time_to_send) {
@@ -273,9 +269,12 @@ void loop(){
         #endif
       }//end if
     }//end if
-  }//end if   
-   Serial.print("Free 5 = ");
-  Serial.println(freeRam());
+  }//end if
+  
+  #if defined(FREERAM)
+    Serial.print("Free 5 = ");
+    Serial.println(freeRam());
+  #endif
   if(msg != ""){//Check empty msg
     if(mio->moteino_send(gw_id, msg.c_str(), msg.length(), 2, 100)){//Wheater Station
       #if defined(DEBUG)
@@ -290,18 +289,19 @@ void loop(){
     }//end if
   }//end if
   
-  Serial.print("Free 6 = ");
-  Serial.println(freeRam());
+  #if defined(FREERAM)
+    Serial.print("Free 6 = ");
+    Serial.println(freeRam());
+  #endif
   
   Serial.flush();
 }//end loop
 
-    int freeRam () 
-    {
-      extern int __heap_start, *__brkval; 
-      int v; 
-      return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
-    }
+int freeRam () {
+  extern int __heap_start, *__brkval; 
+  int v; 
+  return (int) &v - (__brkval == 0 ? (int) &__heap_start : (int) __brkval); 
+}//end freeRam
 
 //Manual interrupt configurations for pin 5 
 void initialise_interrupt(){
@@ -362,20 +362,21 @@ void calcWeather()
   //Calc battery level
   batt_lvl = get_battery_level();  
   
-  //Calc windspdmph_avg2m
+  //Calc windspdmph_avg1m
   float temp = 0;
-  for(int i = 0 ; i < 60; i++)
+  for(int i = 0 ; i < 60; i++){
     temp += windspdavg[i];
-  temp /= 60.0;
-  windspdmph_avg2m = temp;
+  }
+  temp = temp/60;
+  windspdmph_avg1m = temp;
 
   //Calc winddir_avg2m
   temp = 0; //Can't use winddir_avg2m because it's an int
-  for(int i = 0 ; i < 60 ; i++)
+  for(int i = 0 ; i < 60 ; i++){
     temp += winddiravg[i];
-  temp /= 60;
+  }
+  temp = temp/60;
   winddir_avg2m = temp;  
-  
   
   //Total rainfall for the day is calculated within the interrupt
   //Calculate amount of rainfall for the last 60 minutes
