@@ -276,6 +276,9 @@ void loop(){
     Serial.println(freeRam());
   #endif
   if(msg != ""){//Check empty msg
+    //Adding RSSI
+    msg += ' ';
+    msg += mio->moteino_rssi();
     if(mio->moteino_send(gw_id, msg.c_str(), msg.length(), 2, 100)){//Wheater Station
       #if defined(DEBUG)
         Serial.println(F("Node ok"));

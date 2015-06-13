@@ -67,7 +67,7 @@ uint8_t dht11_pin = 5; //DHT11 pin
 GenSens *mio;
 SHT1x sht1x(data_pin, clock_pin);//Soil
 Adafruit_SI1145 uv = Adafruit_SI1145();//UV Light
-//Adafruit_SI1145 *uv;// = Adafruit_SI1145();//UV Light
+
 DHT dht(dht11_pin, DHTTYPE);// Initialize DHT sensor for normal 16mhz Arduino
 
 
@@ -125,12 +125,6 @@ void loop() {
     UVindex /= 100.0; 
     pck += UVindex;//uv.readUV();
     pck += ";";
-
-
-  #if defined(DEBUG)  
-    Serial.print(F("SI1145 temp = "));
-    Serial.println(uv.readTemp());
-  #endif
   
     float dht11_humidity = dht.readHumidity();
     float dht11_temp = dht.readTemperature();
@@ -146,6 +140,11 @@ void loop() {
     pck += ";";
     pck += dht11_temp;
     //pck += ";";
+
+      #if defined(DEBUG)
+        Serial.println(F("To Send = "));
+        Serial.println(pck);
+      #endif
     
     
     if(mio->moteino_send(gw_id, pck.c_str(), pck.length(), 2, 200)){

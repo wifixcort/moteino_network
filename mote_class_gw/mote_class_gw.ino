@@ -82,6 +82,8 @@ void loop(){
           msg[i] = ' ';
         }//end if
       }//end for
+      msg += ' ';
+      msg += mio->moteino_rssi();
       Serial.print(msg);//Print sensor values
       Serial.println();//end structure transmition to Emoncms
     }//end if

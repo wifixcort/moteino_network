@@ -57,7 +57,7 @@ class GenSens{
 	//const char *moteino_type;
 	//unsigned long uptime;
 	RFM69 radio;
-	void alert_incomming(uint8_t t_delay);
+	void alert(uint8_t t_delay);
   public:
     GenSens(){};//Empty constructor
 	~GenSens();
@@ -67,5 +67,6 @@ class GenSens{
 	boolean moteino_send(uint8_t &gateway, const char *buffer, uint8_t bufferSize, uint8_t retries=2, uint8_t retryWaitTime=40);// const void* buffer
 	void mote_sleep();
    uint8_t moteino_id_receive();
+   int moteino_rssi();
 };
 #endif /* #ifndef __GENSENS_H__ */
