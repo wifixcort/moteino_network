@@ -73,8 +73,6 @@ uint8_t netword_id = 215; //Gateway
 String pck = "";//Packet to send
 String msg = "";//Received packets
 String temp ="";
-unsigned long prev_time = 0;
-unsigned long time_to_send = 1000*15;//1000*Ns
 
 
 uint8_t count = 0;//Debug purpose
@@ -123,32 +121,27 @@ void loop(){
     Serial.println(freeRam());
   #endif
   //Time!!!
+  
   temp = serial_read(1000);//Get messages from UNO
-//  unsigned long current_time = millis();
-//  if(current_time - prev_time > time_to_send) {
-  // save the last time
-//  prev_time = current_time;
-    if(temp != ""){//Check empty temp
-      //serial_write(2000);
-      //Send messages received from UNO and send to GW
-      pck = String(node_id);//add node ID
-      pck += ' ';
-      pck += temp;
-      temp = "";
-      if(mio->moteino_send(gw_id, pck.c_str(), pck.length(), 2, 100)){//Wheater Station
-        #if defined(DEBUG)
-          Serial.println(F("Interno ok"));
-          Serial.println(pck);
-        #endif
-      }else{
-        #if defined(DEBUG)
-          Serial.println(F("Interno not send"));
-          Serial.println(pck);       
-        #endif
-      }//end if
+
+  if(temp != ""){//Check empty temp
+    //Send messages received from UNO and send to GW
+    pck = String(node_id);//add node ID
+    pck += ' ';
+    pck += temp;
+    temp = "";
+    if(mio->moteino_send(gw_id, pck.c_str(), pck.length(), 2, 100)){//Wheater Station
+      #if defined(DEBUG)
+        Serial.println(F("Interno ok"));
+        Serial.println(pck);
+      #endif
+    }else{
+      #if defined(DEBUG)
+        Serial.println(F("Interno not send"));
+        Serial.println(pck);       
+      #endif
     }//end if
-      //prev_time = current_time;
-//  }//end if
+  }//end if
   #if defined(FREERAM)
     Serial.print("Free 5 = ");
     Serial.println(freeRam());
@@ -184,9 +177,6 @@ String serial_read(unsigned long timeOut){
       mjs +=c;
     }//end if
   }//end while
-  if(msg!=""){
- //   _dbg.println(msg);
-  }  
   return mjs;
 }//end serial_read
 
