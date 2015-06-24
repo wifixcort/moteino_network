@@ -37,52 +37,22 @@ http://crcibernetica.com
 #include <RFM69.h>
 #include <SPI.h>
 #include <LowPower.h>   //https://github.com/rocketscream/Low-Power
-
+//------------------------------------------------------------
 #include <SoftwareSerial.h>
 
 #include "Adafruit_FONA.h"
-
-
-//#include <Wire.h> //I2C needed for sensors
-//#include "MPL3115A2.h" //Pressure sensor
-//#include "HTU21D.h" //Humidity sensor
-
-
-//SoftwareSerial debug(3, 4);//ARDUINO(RX, TX)->ESP8266(TX, RX)
 #define _serial Serial
-//#define _dbg  debug
 
-//---------FONA network-------------
-//
+#define FREQUENCY     RF69_915MHZ
+#define ENCRYPTKEY    "sampleEncryptKey"
+#define SERIAL_BAUD   115200 
+#define DEBUG //uncoment for debuging
+
 #define FONA_RX 3
 #define FONA_TX 4
 #define FONA_RST 5
 #define FONA_KEY 7
 #define FONA_PS 8
-
-//------------------------------------------------------------
-
-#define FREQUENCY     RF69_915MHZ
-#define ENCRYPTKEY    "sampleEncryptKey"
-#define SERIAL_BAUD   9600
-//#define DEBUG //uncoment for debuging
-//#define DEBUG1 //uncoment for debuging
-//#define FREERAM
-
-GenSens *mio;
-
-//------------Network identifiers-----------------
-uint8_t node_id = 2;   //This node id
-uint8_t gw_id = 1;    //gatewayId
-uint8_t netword_id = 215; //Gateway
-
-
-//uint8_t t_wait = 1;  //Wait T_WAIT*8 [8 because you sleep 8s] just for simple nodes, not for gateway
-
-//---Paquetes to route----
-String pck = "";//Packet to send
-String msg = "";//Received packets
-String temp ="";//Temporal buffer to receive from RX/TX
 
 //=======FONA things======
 // this is a large buffer for replies
@@ -95,6 +65,14 @@ uint8_t readline(char *buff, uint8_t maxbuff, uint16_t timeout = 0);
 
 
 
+GenSens *mio;
+
+uint8_t node_id = 1;   //This node id
+uint8_t gateway = 215; //Gateway
+//uint8_t t_wait = 1;  //Wait T_WAIT*8 [8 because you sleep 8s] just for simple nodes, not for gateway
+
+String pck = "";//Packet to send
+String msg = "";//Received packets
 
 void setup() {
   Serial.begin(SERIAL_BAUD);
@@ -125,7 +103,7 @@ void setup() {
     digitalWrite(9, HIGH);
   #endif
 
-  mio  = new GenSens(node_id, FREQUENCY, ENCRYPTKEY, netword_id);//node#, freq, encryptKey, gateway, LowPower/HighPower(false/true)
+  mio  = new GenSens(node_id, FREQUENCY, ENCRYPTKEY, gateway, true);//node#, freq, encryptKey, gateway, LowPower/HighPower(false/true)
   
    //_dbg.begin(SERIAL_BAUD);
   #if defined(DEBUG)
@@ -140,67 +118,42 @@ void setup() {
   #endif
 }//end setup
 
-void loop(){   
-  #if defined(FREERAM)
-    Serial.print("Free 2 = ");
-    Serial.println(freeRam());
-  #endif
-
-  //---------All nodes---------------
-  mio->moteino_receive(msg);
-  #if defined(DEBUG1)
-    if(msg != ""){
-      Serial.println(F("Paquete de un nodo"));
-      Serial.println(msg);
-    }
-  #endif
-  
-  temp = serial_read(1000);//Get messages from UNO
-
-  if(temp != ""){//Check empty temp
-    //Send messages received from UNO and send to GW
-    pck = String(node_id);//add node ID
-    pck += ' ';
-    pck += temp;
-    temp = "";
-    send_url(pck);//Send URL through FONA to emoncms cloud
-    if(mio->moteino_send(gw_id, pck.c_str(), pck.length(), 2, 100)){//Wheater Station
+void loop(){
+  //if(n_times >= T_WAIT){
+    mio->moteino_receive(msg);
+    
+    if(msg != ""){//Check if msg is empty
       #if defined(DEBUG)
-        Serial.println(F("Interno ok"));
-        Serial.println(pck);
+        Serial.print(F("Node ID = "));
       #endif
-    }else{
+      //Serial.print((unsigned int)mio->moteino_id_receive());//Send Id to RPI/Emoncms
       #if defined(DEBUG)
-        Serial.println(F("Interno not send"));
-        Serial.println(pck);       
-      #endif
+        Serial.print(F("Packet received from this node = "));
+      #endif      
+      //Serial.print(' ');
+      for(uint8_t i = 0; i < msg.length(); i++){
+        if((msg[i] == ';')){
+          msg[i] = ' ';
+        }//end if
+      }//end for
+      msg += ' ';
+      msg += mio->moteino_rssi();
+      Serial.print(msg);//Print sensor values
+      Serial.println();//end structure transmition to Emoncms
+      send_url(msg);
+      msg = "";
     }//end if
-  }//end if
-  #if defined(FREERAM)
-    Serial.print("Free 5 = ");
-    Serial.println(freeRam());
-  #endif
-   if(msg != ""){//Check empty msg
-    //Adding RSSI
-    msg += ' ';
-    msg += mio->moteino_rssi();
-    send_url(msg);//Send URL through FONA to emoncms cloud
-    if(mio->moteino_send(gw_id, msg.c_str(), msg.length(), 2, 100)){//Wheater Station
-      #if defined(DEBUG)
-        Serial.println(F("Node ok"));
-        Serial.println(msg);
-      #endif
-    }else{
-      #if defined(DEBUG)
-        Serial.println(F("Node not send"));
-        Serial.println(msg);       
-      #endif
-    }//end if
-  }//end if 
-   
-  
+    
+    //n_times = 0;//Back to start
+  //}else{
+   // n_times++;//wait more
+  //}  
   Serial.flush();
-}//end loop
+  //mio->mote_sleep();
+  //LowPower.powerDown(SLEEP_2S, ADC_OFF, BOD_OFF);
+}
+
+
 
 String json_split(String &message, String &node_id){
   String brak = "\{";
@@ -224,7 +177,9 @@ String json_split(String &message, String &node_id){
       //Serial.println(brak);
       number = "";
     }else{
-      number += message[j];
+      if(message[j]!= '\r'){
+        number += message[j];
+      }
     }//end if
     
   }//end for
@@ -261,6 +216,8 @@ int send_url(String &raw_paq){
   String node = "";//Store node id
   String json = json_split(raw_paq, node);//split packet into json format and store node id througth reference
   String url = "166.78.62.254/input/post.json?node="+node+"&apikey=d1699ac02ed979dd0c4af09b84a3c9f5&json=";
+
+  
   
   int data_len = json.length()+1;
   char data[data_len];
@@ -282,7 +239,7 @@ int send_url(String &raw_paq){
   #endif
        
   if (!fona.HTTP_GET_start(c_url, &statuscode, (uint16_t *)&length)) {
-    Serial.println("GRPS send failed!");
+    Serial.println("GPRS send failed!");
     return -1;
   }else{
     Serial.println("GPRS send ok");

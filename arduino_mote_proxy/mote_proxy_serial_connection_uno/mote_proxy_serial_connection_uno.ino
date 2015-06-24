@@ -56,7 +56,7 @@ SoftwareSerial debug(3, 4);//ARDUINO(RX, TX)->ESP8266(TX, RX)
 #define FREQUENCY     RF69_915MHZ
 #define ENCRYPTKEY    "sampleEncryptKey"
 #define SERIAL_BAUD   9600
-//#define DEBUG //uncoment for debuging
+#define DEBUG //uncoment for debuging
 //#define DEBUG1 //uncoment for debuging
 //#define FREERAM
 
