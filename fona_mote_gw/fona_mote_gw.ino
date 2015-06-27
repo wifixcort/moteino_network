@@ -119,6 +119,12 @@ void setup() {
 }//end setup
 
 void loop(){
+  if(check_fona() == -1){
+    fona_off();
+    fona_on();
+    gprs_disable();
+    gprs_enable();
+  }//end if
   //if(n_times >= T_WAIT){
     mio->moteino_receive(msg);
     

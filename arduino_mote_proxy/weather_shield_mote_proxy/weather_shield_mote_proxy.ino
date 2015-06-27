@@ -159,11 +159,11 @@ void setup()
 
 void loop(){
   unsigned long currentMillis = millis();
- 
+  iterat();//Do my thinks 
   if(currentMillis - previousMillis > interval) {
     // save the last time you blinked the LED 
     previousMillis = currentMillis;
-    iterat();//Do my thinks
+    printWeather();
   }
   
 }
@@ -211,9 +211,6 @@ void iterat(){
   //    rainHour[minutes] = 0; //Zero out this minute's rainfall amount
   //    windgust_10m[minutes_10m] = 0; //Zero out this minute's gust
     }
-
-    //Report all readings every second
-    printWeather();
 
     digitalWrite(STAT1, LOW); //Turn off stat LED
   }

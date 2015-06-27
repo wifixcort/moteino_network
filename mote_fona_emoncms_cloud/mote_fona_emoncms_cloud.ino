@@ -65,14 +65,14 @@ http://crcibernetica.com
 #define FREQUENCY     RF69_915MHZ
 #define ENCRYPTKEY    "sampleEncryptKey"
 #define SERIAL_BAUD   9600
-//#define DEBUG //uncoment for debuging
+#define DEBUG //uncoment for debuging
 //#define DEBUG1 //uncoment for debuging
 //#define FREERAM
 
 GenSens *mio;
 
 //------------Network identifiers-----------------
-uint8_t node_id = 2;   //This node id
+uint8_t node_id = 3;   //This node id
 uint8_t gw_id = 1;    //gatewayId
 uint8_t netword_id = 215; //Gateway
 
@@ -93,18 +93,31 @@ Adafruit_FONA fona = Adafruit_FONA(FONA_RST);
 
 uint8_t readline(char *buff, uint8_t maxbuff, uint16_t timeout = 0);
 
+unsigned int fona_coun_resets = 0;
 
 
 
 void setup() {
   Serial.begin(SERIAL_BAUD);
+    fonaSS.begin(4800); // if you're using software serial
+    pinMode(FONA_KEY, OUTPUT);
+  pinMode(FONA_PS, INPUT);
+  analogReference(INTERNAL);
+  delay(2000);
+  fona_off();
+  fona_on();
   //while (!Serial);///?????
   // make it slow so its easy to read!
   //fona_on();
-  fonaSS.begin(4800); // if you're using software serial
+ 
     // See if the FONA is responding
-  check_fona();
-  
+  if(check_fona() == -1){
+    fona_off();
+    delay(6000);
+    flushSerial();
+    fona_on();
+  } 
+
   // Print SIM card IMEI number.
   char imei[15] = {0}; // MUST use a 16 character buffer for IMEI!
   uint8_t imeiLen = fona.getIMEI(imei);
@@ -113,9 +126,9 @@ void setup() {
       Serial.print("SIM card IMEI: "); Serial.println(imei);
     #endif
   }//end if
-  
   //APN configuration
-  //fona.setGPRSNetworkSettings(F("kolbi3g"), F(""), F(""));
+  fona.setGPRSNetworkSettings(F("kolbi3g"), F(""), F(""));
+
   
   gprs_disable();
   gprs_enable();
@@ -140,7 +153,13 @@ void setup() {
   #endif
 }//end setup
 
-void loop(){   
+void loop(){
+  /*if(check_fona() == -1){
+    fona_off();
+    fona_on();
+    gprs_disable();
+    gprs_enable();
+  }//end if  */
   #if defined(FREERAM)
     Serial.print("Free 2 = ");
     Serial.println(freeRam());
@@ -163,7 +182,32 @@ void loop(){
     pck += ' ';
     pck += temp;
     temp = "";
-    send_url(pck);//Send URL through FONA to emoncms cloud
+    String nodo_13 = "13 534 654 234 654 344 65";
+    String nodo_14 = "14 534 654 234 654 344 65";
+    String nodo_15 = "15 534 654 234 654 344 65";
+    String nodo_16 = "16 534 654 234 654 344 65";
+    String nodo_17 = "17 534 654 234 654 344 65";
+    send_url(nodo_13);
+    send_url(nodo_14);
+    send_url(nodo_15);
+    send_url(nodo_16);
+    send_url(nodo_17);
+    if(send_url(pck) == -1){
+      if((fona.GPRSstate()==0)||(fona.getNetworkStatus() == 0)){
+        fona_off();
+        delay(6000);
+        flushSerial();
+        fona_on();
+        check_fona();
+        gprs_enable();
+        fona_coun_resets++;
+        String fona_rst = "4 "+String(fona_coun_resets);
+        delay(2000);
+        send_url(fona_rst);
+        }
+      }//end if 
+      //}//end if
+    }//end if
     if(mio->moteino_send(gw_id, pck.c_str(), pck.length(), 2, 100)){//Wheater Station
       #if defined(DEBUG)
         Serial.println(F("Interno ok"));
@@ -175,7 +219,6 @@ void loop(){
         Serial.println(pck);       
       #endif
     }//end if
-  }//end if
   #if defined(FREERAM)
     Serial.print("Free 5 = ");
     Serial.println(freeRam());
@@ -184,7 +227,7 @@ void loop(){
     //Adding RSSI
     msg += ' ';
     msg += mio->moteino_rssi();
-    send_url(msg);//Send URL through FONA to emoncms cloud
+    send_url(msg);
     if(mio->moteino_send(gw_id, msg.c_str(), msg.length(), 2, 100)){//Wheater Station
       #if defined(DEBUG)
         Serial.println(F("Node ok"));
@@ -224,7 +267,9 @@ String json_split(String &message, String &node_id){
       //Serial.println(brak);
       number = "";
     }else{
-      number += message[j];
+      if(message[j]!= '\r'){
+        number += message[j];
+      }
     }//end if
     
   }//end for
@@ -232,6 +277,7 @@ String json_split(String &message, String &node_id){
   return brak;
   
 }//end json_pck
+
 
 
 String serial_read(unsigned long timeOut){
@@ -268,8 +314,7 @@ int send_url(String &raw_paq){
   #if defined(DEBUG)
     Serial.println(json);
   #endif
-
-
+  
 //166.78.62.254/input/post.json?node=3&json={1:3,2:482,3:588}&apikey=d1699ac02ed979dd0c4af09b84a3c9f5
   int l_url = url.length()+json.length();//strlen(data)
   char c_url[l_url];
@@ -282,7 +327,7 @@ int send_url(String &raw_paq){
   #endif
        
   if (!fona.HTTP_GET_start(c_url, &statuscode, (uint16_t *)&length)) {
-    Serial.println("GRPS send failed!");
+    Serial.println("GPRS send failed!");
     return -1;
   }else{
     Serial.println("GPRS send ok");
@@ -325,6 +370,7 @@ int gprs_enable(){
       Serial.println(F("GPRS ON"));
     #endif
   }
+  
 }//end gprs_enable
 
 int gprs_disable(){
@@ -359,20 +405,21 @@ int check_fona(){
   return 0;
 }//end check_fona
 
-void fona_off(){
+void fona_on(){
   #if defined(DEBUG)
-    Serial.println("Turning off Fona: ");
+    Serial.println("Turning on Fona: ");
   #endif
   while(digitalRead(FONA_PS)==LOW){
     digitalWrite(FONA_KEY, LOW);
   }
   digitalWrite(FONA_KEY, HIGH);
   delay(4000);
+  
 }
 
-void fona_on(){
+void fona_off(){
   #if defined(DEBUG)
-    Serial.println("Turning on Fona: ");
+    Serial.println("Turning off Fona: ");
   #endif
   while(digitalRead(FONA_PS)==HIGH){
     digitalWrite(FONA_KEY, LOW);
@@ -380,5 +427,3 @@ void fona_on(){
   digitalWrite(FONA_KEY, HIGH);
   delay(4000);
 }
-
-

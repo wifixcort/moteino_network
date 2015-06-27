@@ -42,7 +42,7 @@ http://crcibernetica.com
 #define FREQUENCY     RF69_915MHZ
 #define ENCRYPTKEY    "sampleEncryptKey"
 #define SERIAL_BAUD   115200 
-//#define DEBUG //uncoment for debuging
+#define DEBUG //uncoment for debuging
 
 GenSens *mio;
 
