@@ -47,14 +47,14 @@ http://crcibernetica.com
 GenSens *mio;
 
 uint8_t node_id = 1;   //This node id
-uint8_t gateway = 215; //Gateway
+uint8_t network = 199; //Gateway
 //uint8_t t_wait = 1;  //Wait T_WAIT*8 [8 because you sleep 8s] just for simple nodes, not for gateway
 
 String pck = "";//Packet to send
 String msg = "";//Received packets
 
 void setup() {
-  mio  = new GenSens(node_id, FREQUENCY, ENCRYPTKEY, gateway, true);//node#, freq, encryptKey, gateway, LowPower/HighPower(false/true)
+  mio  = new GenSens(node_id, FREQUENCY, ENCRYPTKEY, network, false);//node#, freq, encryptKey, gateway, LowPower/HighPower(false/true)
   Serial.begin(SERIAL_BAUD);
   #if defined(DEBUG)
     Serial.println(F("This is your gateway")); 

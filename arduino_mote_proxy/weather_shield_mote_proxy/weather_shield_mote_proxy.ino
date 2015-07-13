@@ -60,8 +60,8 @@ volatile byte windClicks = 0;
 //Rain over the past hour (store 1 per minute)
 //Total rain over date (store one per day)
 
-byte windspdavg[120]; //120 bytes to keep track of 2 minute average
-int winddiravg[120]; //120 ints to keep track of 2 minute average
+byte windspdavg[60]; //120 bytes to keep track of 2 minute average
+int winddiravg[60]; //120 ints to keep track of 2 minute average
 float windgust_10m[10]; //10 floats to keep track of 10 minute max
 int windgustdirection_10m[10]; //10 ints to keep track of 10 minute max
 volatile float rainHour[60]; //60 floating numbers to keep track of 60 minutes of rain
@@ -177,12 +177,19 @@ void iterat(){
     lastSecond += 1000;
 
     //Take a speed and direction reading every second for 2 minute average
-    if(++seconds_2m > 119) seconds_2m = 0;
+    if(++seconds_2m > 59) seconds_2m = 0;
 
     //Calc the wind speed and direction every second for 120 second to get 2 minute average
     float currentSpeed = get_wind_speed();
+    
     //float currentSpeed = random(5); //For testing
-    int currentDirection = get_wind_direction();
+    int adc = 0;
+    int currentDirection = get_wind_direction(adc);
+  /*Serial.print(currentDirection);
+  Serial.print("----");
+  Serial.print(adc);
+  Serial.print("=========");
+  Serial.println(currentSpeed);*/
     windspdavg[seconds_2m] = (int)currentSpeed;
     winddiravg[seconds_2m] = currentDirection;
     //if(seconds_2m % 10 == 0) displayArrays(); //For testing
@@ -222,8 +229,8 @@ void iterat(){
 void calcWeather()
 {
   //Calc winddir
-  winddir = get_wind_direction();
-
+  int ac = 0;
+  winddir = get_wind_direction(ac);
   //Calc windspeed
   windspeedmph = get_wind_speed();
 
@@ -235,16 +242,16 @@ void calcWeather()
 
   //Calc windspdmph_avg2m
   float temp = 0;
-  for(int i = 0 ; i < 120 ; i++)
+  for(int i = 0 ; i < 60 ; i++)
     temp += windspdavg[i];
-  temp /= 120.0;
+  temp /= 60.0;
   windspdmph_avg2m = temp;
 
   //Calc winddir_avg2m
   temp = 0; //Can't use winddir_avg2m because it's an int
-  for(int i = 0 ; i < 120 ; i++)
+  for(int i = 0 ; i < 60 ; i++)
     temp += winddiravg[i];
-  temp /= 120;
+  temp /= 60;
   winddir_avg2m = temp;
 
   //Calc humidity
@@ -301,7 +308,6 @@ float get_battery_level()
   rawVoltage = operatingVoltage * rawVoltage; //Convert the 0 to 1023 int to actual voltage on BATT pin
   
   rawVoltage *= 4.90; //(3.9k+1k)/1k - multiple BATT voltage by the voltage divider to get actual system voltage
-  
   return(rawVoltage);
 }
 
@@ -326,17 +332,18 @@ float get_wind_speed()
 }
 
 //Read the wind direction sensor, return heading in degrees
-int get_wind_direction() 
+int get_wind_direction(int &ad) 
 {
   unsigned int adc;
 
   adc = analogRead(WDIR); // get the current reading from the sensor
-
+  ad = adc;
+  //ad = adc;
   // The following table is ADC readings for the wind direction sensor output, sorted from low to high.
   // Each threshold is the midpoint between adjacent headings. The output is degrees for that ADC reading.
   // Note that these are not in compass degree order! See Weather Meters datasheet for more information.
 
-  if (adc < 380) return (113);
+ /* if (adc < 380) return (113);
   if (adc < 393) return (68);
   if (adc < 414) return (90);
   if (adc < 456) return (158);
@@ -352,7 +359,31 @@ int get_wind_direction()
   if (adc < 940) return (293);
   if (adc < 967) return (315);
   if (adc < 990) return (270);
+  return (360); // error, disconnected?
+ (315);*/
+ 
+ /*Redefined for 10k resistence and voltage 3.3v*/
+  if (adc < 755) return (293);
+  if (adc < 770) return (248);
+  if (adc < 777) return (270);
+  if (adc < 800) return (338);
+  if (adc < 835) return (315); 
+  if (adc < 865)  return (23);
+  if (adc < 885)   return (0);
+  if (adc < 925) return (203);
+  if (adc < 940)return (225);
+  if (adc < 970) return (68);
+  if (adc < 978) return (45);
+  if (adc < 990)return (158);
+  if (adc < 1002)return (180);
+  if (adc < 1008)return (113);
+  if (adc < 1015)return (135);
+  if (adc < 1023) return (90);
   return (-1); // error, disconnected?
+
+
+
+  
 }
 
 

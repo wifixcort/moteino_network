@@ -1,20 +1,36 @@
-/*********************************************************************
-This is an example for our Monochrome OLEDs based on SSD1306 drivers
+/*
+Moteino Inspector Trasmition Network
 
-  Pick one up today in the adafruit shop!
-  ------> http://www.adafruit.com/category/63_98
+Ricardo Mena C
+ricardo@crcibernetica.com
+http://crcibernetica.com
 
-This example is for a 128x64 size display using I2C to communicate
-3 pins are required to interface (2 I2C and one reset)
+ License
+ **********************************************************************************
+ This program is free software; you can redistribute it 
+ and/or modify it under the terms of the GNU General    
+ Public License as published by the Free Software       
+ Foundation; either version 3 of the License, or        
+ (at your option) any later version.                    
+                                                        
+ This program is distributed in the hope that it will   
+ be useful, but WITHOUT ANY WARRANTY; without even the  
+ implied warranty of MERCHANTABILITY or FITNESS FOR A   
+ PARTICULAR PURPOSE. See the GNU General Public        
+ License for more details.                              
+                                                        
+ You should have received a copy of the GNU General    
+ Public License along with this program.
+ If not, see <http://www.gnu.org/licenses/>.
+                                                        
+ Licence can be viewed at                               
+ http://www.gnu.org/licenses/gpl-3.0.txt
 
-Adafruit invests time and resources providing this open source code, 
-please support Adafruit and open-source hardware by purchasing 
-products from Adafruit!
+ Please maintain this license information along with authorship
+ and copyright notices in any redistribution of this code
+ **********************************************************************************
+*/
 
-Written by Limor Fried/Ladyada  for Adafruit Industries.  
-BSD license, check license.txt for more information
-All text above, and the splash screen must be included in any redistribution
-*********************************************************************/
 
 #include <SPI.h>
 #include <Wire.h>
@@ -25,20 +41,22 @@ All text above, and the splash screen must be included in any redistribution
 Adafruit_SSD1306 display(OLED_RESET);
 
 //-----------------
-#include <GenSens.h>
+#include <Moteino.h>
 #include <RFM69.h>
 #include <LowPower.h>   //https://github.com/rocketscream/Low-Power
 
 #define FREQUENCY     RF69_915MHZ
 #define ENCRYPTKEY    "sampleEncryptKey"
-#define SERIAL_BAUD   115200 
+#define SERIAL_BAUD   9600
+#define DEBUG
 
-GenSens *mio;
+Moteino *mio;
+
 
 uint8_t node_id = 1;   //This node id, default for OLED proyect
-uint8_t gateway = 215; //Gateway
+uint8_t network = 199; //Gateway
 
-//String pck = "";//Packet to send
+String inspector_pack = "";//node_id + RSSI_1 + RSSI_2 + ... + RSSI_n
 String msg = "";//Received packets
 
 volatile uint8_t up_down_buttons = 0;//node up or down
@@ -46,8 +64,49 @@ volatile unsigned long deb_interval, last_time, last;
 uint8_t temp_button = 0;
 
 int node_rssi = 0;
+uint8_t id_msg = 0;
+volatile boolean scroll = false;
+String idrssi = "";
 
 int display_conf(uint8_t font_size, uint8_t x_cursor, uint8_t y_cursor);
+
+class Inspector_string{
+  private:
+    unsigned int s_length;
+  
+  public:
+    String insp_string[5] ={"*","*","*","*","*"};
+    
+    Inspector_string(){
+      s_length = 5;
+      //insp_string[s_length];//Matrix length
+     /* for(unsigned int i = 0; i < s_length; i++){
+       // insp_string[i] = "4";//
+      }*/
+    }//end constructor
+    
+    String insp_get_last(void){
+      return insp_string[s_length-1];
+    }//end insp_pop
+
+    int insp_set_last(String last){//Set last node 
+      for(unsigned int i = 1; i< s_length; i++){//move all forward a single step
+          insp_string[i-1] = insp_string[i];
+      }//end for
+      insp_string[s_length-1] = last;
+      //Serial.println(insp_string[s_length-1]);
+      #if defined(DEBUG)
+        for(unsigned int i = 1; i< s_length; i++){//move all forward a single step
+          Serial.println(insp_string[i]);
+        }//end for
+      #endif
+      return 1;
+      
+    }//emd insp_push
+        
+};
+
+Inspector_string *mip;
 
 void setup()   {                
   Serial.begin(SERIAL_BAUD);
@@ -60,7 +119,7 @@ void setup()   {
   // Since the buffer is intialized with an Adafruit splashscreen
   // internally, this will display the splashscreen.
   display.display();
-  delay(2000);
+  delay(500);
 
   // draw many lines
   /*testdrawline();
@@ -71,42 +130,25 @@ void setup()   {
   // Clear the buffer.
   display.clearDisplay();
 
-  //mio  = new GenSens(node_id, FREQUENCY, ENCRYPTKEY, gateway, true);//node#, freq, encryptKey, gateway, LowPower/HighPower(false/true)
+  mio  = new Moteino(node_id, FREQUENCY, ENCRYPTKEY, network, false);//node#, freq, encryptKey, gateway, LowPower/HighPower(false/true)
   char buff[30];
     sprintf(buff, "\nTransmitting at: %d Mhz...", FREQUENCY==RF69_433MHZ ? 433 : FREQUENCY==RF69_868MHZ ? 868 : 915);
   // text display tests
   display_conf(1, 0, 15);
   display.println(buff);
   display.display();
-  delay(2000);
+  delay(500);
   display.clearDisplay();
-  //display.setTextColor(BLACK, WHITE); // 'inverted' text
-  //display.println(3.141592);
-  //display.setTextSize(2);
-  //display.setTextColor(WHITE);
-  //display.print("0x"); 
-  //display.println(0xDEADBEEF, HEX);
   
+  mip = new Inspector_string();
   
-  pinMode(5, INPUT_PULLUP);
-  pinMode(6, INPUT_PULLUP);
-  
+  pinMode(5, INPUT_PULLUP);//Interrupt UP
+  pinMode(6, INPUT_PULLUP);//Interrupt DOWN
+  pinMode(7, INPUT_PULLUP);//Interrupt CHANGE
   
  InitialiseInterrupt();
  interrupts();
-  // miniature bitmap display
-  /*display.clearDisplay();
-  display.drawBitmap(30, 16,  logo16_glcd_bmp, 16, 16, 1);
-  display.display();*/
 
-  // invert the display
-  /*display.invertDisplay(true);
-  delay(1000); 
-  display.invertDisplay(false);
-  delay(1000); */
-
-  // draw a bitmap icon and 'animate' movement
-  //testdrawbitmap(logo16_glcd_bmp, LOGO16_GLCD_HEIGHT, LOGO16_GLCD_WIDTH);
 }
 
 
@@ -115,43 +157,167 @@ void loop() {
     temp_button = up_down_buttons;
     delete(mio);
     node_id = up_down_buttons;
-    mio = new GenSens(node_id, FREQUENCY, ENCRYPTKEY, gateway, true);//node#, freq, encryptKey, gateway, LowPower/HighPower(false/true)
-  }
-  mio->moteino_receive(msg);  
-  if(msg != ""){
-    node_rssi = mio->moteino_rssi();
-    Serial.println(msg);
-  }
-    
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(0,10);
-  display.println("Contador de Moteino!!");  
-  //delay(2000);
-  //display.clearDisplay();
-  display.setTextColor(WHITE);
-  display.println("");
-  //----node id---
-  display.setTextColor(WHITE);
-    display.setCursor(50,30);
-  display.println(mio->id);
-  //----node rssi---incomming pack
-  display.setTextColor(WHITE);
-  display.setCursor(0,50);
-  display.print(F("RSSI = "));
-  //-----
-  display.setTextColor(WHITE);
-  display.setCursor(50,50);
-  display.println(node_rssi);
-//  display_conf(1, 0, 0);
-    display.display();
-  //delay(2000);
-  display.clearDisplay();
+    mio = new Moteino(node_id, FREQUENCY, ENCRYPTKEY, network, false);//node#, freq, encryptKey, gateway, LowPower/HighPower(false/true)
+    #if defined(DEBUG)
+      Serial.println(F("Changing Node id"));  
+      Serial.println(node_id);
+    #endif
+}
+  mio->moteino_receive(msg);
   
-  /*testscrolltext();
-  display.display();
-  delay(2000);
-  display.clearDisplay();  */
+    if(msg != ""){//Check if msg is empty
+      node_rssi = mio->moteino_rssi();
+      id_msg = mio->moteino_id_receive();
+      #if defined(DEBUG)
+        Serial.print(F("Node ID = "));
+        Serial.println();
+      #endif
+      //Serial.print((unsigned int)mio->moteino_id_receive());//Send Id to RPI/Emoncms
+      #if defined(DEBUG)
+        Serial.print(F("Packet received from this node = "));
+      #endif      
+      //Serial.print(' ');
+      for(uint8_t i = 0; i < msg.length(); i++){
+        if((msg[i] == ';')){
+          msg[i] = ' ';
+        }//end if
+      }//end for
+      msg += ' ';
+      msg += node_rssi;
+      Serial.print(msg);//Print sensor values
+      Serial.println();//end structure transmition to Emoncms
+      Serial.flush();
+      idrssi += id_msg;
+      idrssi +="   ";
+      idrssi +=node_rssi;
+      if(idrssi != ""){
+        mip->insp_set_last(idrssi);
+      }
+      idrssi = "";
+    }//end if
+    //#endif
+   /* boolean flag_1 = true;
+    boolean flag_2 = false;
+    for(uint8_t i = 0; i < msg.length(); i++){
+      if(((msg[i] == ';')||(msg[i]==' '))&&(flag_1)){
+        inspector_pack += "_";
+        flag_1 = false;
+      }//end if
+      if(flag_1){
+        inspector_pack += msg[i];//Node id
+      }//if      
+      if(msg[i]=='-'){
+        flag_2 = true;
+      }
+      if(flag_2){
+        if(!(msg[i] == ';')||!(msg[i]==' ')){
+          inspector_pack += msg[i]; 
+        }else{
+
+          inspector_pack += "_";
+          flag_2 = false;                
+        }
+      }
+    }//end for*/
+  /*  Serial.println(inspector_pack);
+      for(unsigned int i = 0; i< 5; i++){
+    Serial.print(mip->insp_string[i]);
+    Serial.print(" ");
+      Serial.print("|");
+  }
+  Serial.println("");
+  Serial.println("------");*/
+   // mip->insp_set_last(inspector_pack);
+
+  if(!scroll){
+    display.setTextSize(1);
+    display.setTextColor(WHITE);
+    display.setCursor(0,10);
+    display.println(F("Contador de Moteino!!"));  
+    //delay(2000);
+    //display.clearDisplay();
+    display.setTextColor(WHITE);
+    display.println("");
+    //---------node id---------
+    display.setTextColor(WHITE);
+    display.setCursor(0,20);
+    display.print(F("This node ID:"));
+    
+    display.setTextColor(WHITE);
+      display.setCursor(80,20);
+    display.println(mio->moteino_id());//This node ID
+    //----node rssi---incomming pack
+    display.setTextColor(WHITE);
+    display.setCursor(0,40);
+    display.print(F("Node id= "));
+    
+    //---received node id------
+    display.setTextColor(WHITE);
+    display.setCursor(0,40);
+    display.println(id_msg);//------ID message received
+
+    //----RSSI packet receive-----
+    display.setTextColor(WHITE);
+    display.setCursor(0,50);
+    display.print(F("RSSI= "));
+    
+    display.setTextColor(WHITE);
+    display.setCursor(50,50);
+    display.println(node_rssi);//----RSSI
+    
+    //---------------------------
+      display.display();
+    //delay(2000);
+    display.clearDisplay();    
+  }else{
+    //testscrolltext();
+    display.setTextSize(1);
+    display.setTextColor(WHITE);
+    display.setCursor(0,0);
+    display.println(F("#    ID"));
+    
+    display.setTextColor(WHITE);
+    display.setCursor(0,10);
+    display.println(mip->insp_string[0]);
+
+    display.setTextColor(WHITE);
+    display.setCursor(0,20);
+    display.println(mip->insp_string[1]); 
+    Serial.print(mip->insp_string[1]);
+    Serial.print(F("+"));
+    
+    display.setTextColor(WHITE);
+    display.setCursor(0,30);
+    display.println(mip->insp_string[2]);
+    Serial.print(mip->insp_string[2]);
+    Serial.print(F("+"));
+      
+    display.setTextColor(WHITE);
+    display.setCursor(0,40);
+    display.println(mip->insp_string[3]);    
+    Serial.print(mip->insp_string[3]);
+    Serial.print(F("+"));
+
+    display.setTextColor(WHITE);
+    display.setCursor(0,50);
+    display.println(mip->insp_string[4]);   
+    Serial.print(mip->insp_string[4]);
+    Serial.println(F("|"));
+    
+    #if defined(DEBUG)
+      Serial.println(F("Nodo"));
+      for(uint8_t i = 0; i < 5; i++){
+        Serial.print(mip->insp_string[i]);
+        Serial.print(F("+"));
+      }
+    #endif
+    
+    display.display();
+    delay(1000);
+    display.clearDisplay();
+       
+  }//end if
+  
 }//end loop
 
 void InitialiseInterrupt(){
@@ -159,6 +325,7 @@ void InitialiseInterrupt(){
   PCICR |= (1<<PCIE2);
   PCMSK2 |= (1<<PCINT21);
   PCMSK2 |= (1<<PCINT22);
+  PCMSK2 |= (1<<PCINT23);
   MCUCR = (1<<ISC01) | (1<<ISC00);
   sei();
 }//end InitialiseInterrupt
@@ -178,10 +345,16 @@ ISR(PCINT2_vect) {    // Interrupt service routine. Every single PCINT8..14 (=AD
         up_down_buttons--;
       }//end if
     }//end if
+    if(digitalRead(7)==0){
+      if(scroll){
+        scroll = false;
+      }else{
+        scroll = true;
+      }//end if
+      //Crear boolean para listar los nodos
+     }//end if
   }
   last = last_time;
-
-
 }
 
 int display_conf(uint8_t font_size, uint8_t x_cursor, uint8_t y_cursor){
@@ -190,190 +363,3 @@ int display_conf(uint8_t font_size, uint8_t x_cursor, uint8_t y_cursor){
   display.setCursor(x_cursor,y_cursor);
 }//end display_conf
 
-
-
-
-/*void testdrawbitmap(const uint8_t *bitmap, uint8_t w, uint8_t h) {
-  uint8_t icons[NUMFLAKES][3];
- 
-  // initialize
-  for (uint8_t f=0; f< NUMFLAKES; f++) {
-    icons[f][XPOS] = random(display.width());
-    icons[f][YPOS] = 0;
-    icons[f][DELTAY] = random(5) + 1;
-    
-    Serial.print("x: ");
-    Serial.print(icons[f][XPOS], DEC);
-    Serial.print(" y: ");
-    Serial.print(icons[f][YPOS], DEC);
-    Serial.print(" dy: ");
-    Serial.println(icons[f][DELTAY], DEC);
-  }
-
-  while (1) {
-    // draw each icon
-    for (uint8_t f=0; f< NUMFLAKES; f++) {
-      display.drawBitmap(icons[f][XPOS], icons[f][YPOS], logo16_glcd_bmp, w, h, WHITE);
-    }
-    display.display();
-    delay(200);
-    
-    // then erase it + move it
-    for (uint8_t f=0; f< NUMFLAKES; f++) {
-      display.drawBitmap(icons[f][XPOS], icons[f][YPOS],  logo16_glcd_bmp, w, h, BLACK);
-      // move it
-      icons[f][YPOS] += icons[f][DELTAY];
-      // if its gone, reinit
-      if (icons[f][YPOS] > display.height()) {
-	icons[f][XPOS] = random(display.width());
-	icons[f][YPOS] = 0;
-	icons[f][DELTAY] = random(5) + 1;
-      }
-    }
-   }
-}*/
-
-
-/*void testdrawchar(void) {
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(0,0);
-
-  for (uint8_t i=0; i < 168; i++) {
-    if (i == '\n') continue;
-    display.write(i);
-    if ((i > 0) && (i % 21 == 0))
-      display.println();
-  }    
-  display.display();
-}*/
-
-/*void testdrawcircle(void) {
-  for (int16_t i=0; i<display.height(); i+=2) {
-    display.drawCircle(display.width()/2, display.height()/2, i, WHITE);
-    display.display();
-  }
-}*/
-
-/*void testfillrect(void) {
-  uint8_t color = 1;
-  for (int16_t i=0; i<display.height()/2; i+=3) {
-    // alternate colors
-    display.fillRect(i, i, display.width()-i*2, display.height()-i*2, color%2);
-    display.display();
-    color++;
-  }
-}*/
-
-/*void testdrawtriangle(void) {
-  for (int16_t i=0; i<min(display.width(),display.height())/2; i+=5) {
-    display.drawTriangle(display.width()/2, display.height()/2-i,
-                     display.width()/2-i, display.height()/2+i,
-                     display.width()/2+i, display.height()/2+i, WHITE);
-    display.display();
-  }
-}*/
-
-/*void testfilltriangle(void) {
-  uint8_t color = WHITE;
-  for (int16_t i=min(display.width(),display.height())/2; i>0; i-=5) {
-    display.fillTriangle(display.width()/2, display.height()/2-i,
-                     display.width()/2-i, display.height()/2+i,
-                     display.width()/2+i, display.height()/2+i, WHITE);
-    if (color == WHITE) color = BLACK;
-    else color = WHITE;
-    display.display();
-  }
-}*/
-
-/*void testdrawroundrect(void) {
-  for (int16_t i=0; i<display.height()/2-2; i+=2) {
-    display.drawRoundRect(i, i, display.width()-2*i, display.height()-2*i, display.height()/4, WHITE);
-    display.display();
-  }
-}*/
-
-/*void testfillroundrect(void) {
-  uint8_t color = WHITE;
-  for (int16_t i=0; i<display.height()/2-2; i+=2) {
-    display.fillRoundRect(i, i, display.width()-2*i, display.height()-2*i, display.height()/4, color);
-    if (color == WHITE) color = BLACK;
-    else color = WHITE;
-    display.display();
-  }
-}*/
-   
-/*void testdrawrect(void) {
-  for (int16_t i=0; i<display.height()/2; i+=2) {
-    display.drawRect(i, i, display.width()-2*i, display.height()-2*i, WHITE);
-    display.display();
-  }
-}*/
-
-/*void testdrawline() {  
-  for (int16_t i=0; i<display.width(); i+=4) {
-    display.drawLine(0, 0, i, display.height()-1, WHITE);
-    display.display();
-  }
-  for (int16_t i=0; i<display.height(); i+=4) {
-    display.drawLine(0, 0, display.width()-1, i, WHITE);
-    display.display();
-  }
-  delay(250);
-  
-  display.clearDisplay();
-  for (int16_t i=0; i<display.width(); i+=4) {
-    display.drawLine(0, display.height()-1, i, 0, WHITE);
-    display.display();
-  }
-  for (int16_t i=display.height()-1; i>=0; i-=4) {
-    display.drawLine(0, display.height()-1, display.width()-1, i, WHITE);
-    display.display();
-  }
-  delay(250);
-  
-  display.clearDisplay();
-  for (int16_t i=display.width()-1; i>=0; i-=4) {
-    display.drawLine(display.width()-1, display.height()-1, i, 0, WHITE);
-    display.display();
-  }
-  for (int16_t i=display.height()-1; i>=0; i-=4) {
-    display.drawLine(display.width()-1, display.height()-1, 0, i, WHITE);
-    display.display();
-  }
-  delay(250);
-
-  display.clearDisplay();
-  for (int16_t i=0; i<display.height(); i+=4) {
-    display.drawLine(display.width()-1, 0, 0, i, WHITE);
-    display.display();
-  }
-  for (int16_t i=0; i<display.width(); i+=4) {
-    display.drawLine(display.width()-1, 0, i, display.height()-1, WHITE); 
-    display.display();
-  }
-  delay(250);
-}*/
-
-void testscrolltext(void) {
-  display.setTextSize(1);
-  display.setTextColor(WHITE);
-  display.setCursor(50,0);
-  display.clearDisplay();
-  display.println("scroll");
-  display.display();
- 
-/*  display.startscrollright(0x00, 0x0F);
-  delay(2000);
-  display.stopscroll();
-  delay(1000);
-  display.startscrollleft(0x00, 0x0F);
-  delay(2000);
-  display.stopscroll();
-  delay(1000);*/    
-  //display.startscrolldiagright(0x00, 0x07);
-  //delay(2000);
-  display.startscrolldiagleft(0x00, 0x00);
-  delay(2000);
-  display.stopscroll();
-}

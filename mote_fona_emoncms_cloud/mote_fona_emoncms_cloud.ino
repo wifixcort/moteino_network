@@ -85,8 +85,6 @@ String msg = "";//Received packets
 String temp ="";//Temporal buffer to receive from RX/TX
 
 //=======FONA things======
-String apikey="yourApikey";
-
 // this is a large buffer for replies
 char replybuffer[255];
 SoftwareSerial fonaSS = SoftwareSerial(FONA_TX, FONA_RX);
@@ -308,7 +306,7 @@ int send_url(String &raw_paq){
   int16_t length;
   String node = "";//Store node id
   String json = json_split(raw_paq, node);//split packet into json format and store node id througth reference
-  String url = "166.78.62.254/input/post.json?node="+node+"&apikey="+apikey+"&json=";
+  String url = "166.78.62.254/input/post.json?node="+node+"&apikey=APIKEY&json=";
   
   int data_len = json.length()+1;
   char data[data_len];
@@ -316,7 +314,7 @@ int send_url(String &raw_paq){
   #if defined(DEBUG)
     Serial.println(json);
   #endif
-
+  
   int l_url = url.length()+json.length();//strlen(data)
   char c_url[l_url];
   sprintf(c_url, "%s%s", url.c_str(),json.c_str());

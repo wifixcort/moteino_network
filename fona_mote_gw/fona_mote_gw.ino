@@ -74,8 +74,6 @@ uint8_t gateway = 215; //Gateway
 String pck = "";//Packet to send
 String msg = "";//Received packets
 
-String apikey = "yourApikey";
-
 void setup() {
   Serial.begin(SERIAL_BAUD);
   //while (!Serial);///?????
@@ -223,7 +221,7 @@ int send_url(String &raw_paq){
   int16_t length;
   String node = "";//Store node id
   String json = json_split(raw_paq, node);//split packet into json format and store node id througth reference
-  String url = "166.78.62.254/input/post.json?node="+node+"&apikey="+apikey+"&json=";
+  String url = "166.78.62.254/input/post.json?node="+node+"&apikey=d1699ac02ed979dd0c4af09b84a3c9f5&json=";
 
   
   
@@ -234,6 +232,8 @@ int send_url(String &raw_paq){
     Serial.println(json);
   #endif
 
+
+//166.78.62.254/input/post.json?node=3&json={1:3,2:482,3:588}&apikey=d1699ac02ed979dd0c4af09b84a3c9f5
   int l_url = url.length()+json.length();//strlen(data)
   char c_url[l_url];
   sprintf(c_url, "%s%s", url.c_str(),json.c_str());
