@@ -244,12 +244,12 @@ int buttons(){
   last_time = millis();
   deb_interval = last_time-last;
   if(deb_interval > 50){
-    if (digitalRead(5)==0){
+    if (digitalRead(6)==0){
       if(up_down_buttons < 255){//Bock nodes out of range
         up_down_buttons++;
       }//end if
     }//end if
-    if(digitalRead(6)==0){
+    if(digitalRead(5)==0){
       if(up_down_buttons != 0){//Block negative nodes
         up_down_buttons--;
       }//end if
